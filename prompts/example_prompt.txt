@@ -1,0 +1,16 @@
+    Create a Python web scraper that can:
+    1. Extract product information from e-commerce websites
+    2. Handle rate limiting and respect robots.txt
+    3. Store data in a SQLite database with proper schema
+    4. Include comprehensive error handling and logging
+    5. Be configurable for different websites through JSON config
+    6. Support concurrent scraping with thread safety
+    7. Include data validation and cleaning
+    8. Generate reports on scraped data
+
+    The scraper should be production‑ready with:
+    - Proper documentation and docstrings
+    - Unit tests for core functionality
+    - Configuration management
+    - Monitoring and alerting capabilities
+    - Data export functionality (CSV, JSON)

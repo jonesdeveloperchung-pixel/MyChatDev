@@ -3,10 +3,13 @@ Quality gate implementation for controlling workflow execution.
 The gate decides whether the current iteration of the cooperative‑LLM
 workflow should continue or be stopped based on a short LLM‑generated
 assessment of the workflow state.
+
+Author: Jones Chung
 """
 
 import logging
 import re
+import json # Add this import
 from typing import Dict, Any, Tuple
 
 from models.llm_manager import LLMManager
@@ -23,7 +26,7 @@ class QualityGate:
     How it works
     -------------
     1. A prompt is built from the current and, if available, the previous
-       snapshot and sent to a *dedicated* LLM (`gemma3:12b`).  
+       snapshot and sent to a *dedicated* LLM (`gemma3:12b`).
     2. The LLM returns a short text containing a quality score, a change
        magnitude, a decision flag, and optional reasoning.
     3. Those four values are parsed, logged, and used to compute
@@ -36,6 +39,7 @@ class QualityGate:
     def __init__(
         self,
         llm_manager: LLMManager,
+        gate_config: LLMConfig,
         quality_threshold: float = 0.8,
         change_threshold: float = 0.1,
     ):
@@ -47,6 +51,8 @@ class QualityGate:
         llm_manager : LLMManager
             Object that knows how to call the LLM API (wrapper around
             OpenAI/Ollama/…).
+        gate_config : LLMConfig
+            The specific LLM configuration for the quality gate agent.
         quality_threshold : float, optional
             If the LLM’s quality score ≥ this value the gate will halt.
             Default: 0.8.
@@ -56,20 +62,11 @@ class QualityGate:
             Default: 0.1.
         """
         self.llm_manager = llm_manager
+        self.gate_config = gate_config
         self.quality_threshold = quality_threshold
         self.change_threshold = change_threshold
         self.logger = logging.getLogger("coop_llm.quality_gate")
 
-        # Dedicated, deterministic LLM for the gate itself.
-        # gemma3:12b is small enough for fast inference yet
-        # expressive enough for numeric outputs.
-        self.gate_config = LLMConfig(
-            name="Quality Gate",
-            model_id="gemma3:12b",
-            role="quality_gate",
-            temperature=0.1,
-        )
-    
     def _should_halt(
         self,
         decision: str,
@@ -79,12 +76,14 @@ class QualityGate:
         c_threshold: float,
     ) -> bool:
         """Return True if the workflow should stop."""
-        if decision.upper() == "HALT":
+        if quality >= q_threshold and decision.upper() == "HALT":
             return True
-        if quality >= q_threshold:
-            return True
+        
+        # Rule: If change is minimal, it might indicate stagnation, which should also halt
         if change <= c_threshold:
             return True
+
+        # Otherwise, continue
         return False
 
     async def evaluate_state(
@@ -158,8 +157,11 @@ class QualityGate:
 
             # 5️⃣ Determine whether to halt.
             should_halt = self._should_halt(
-                decision, quality_score, change_magnitude,
-                self.quality_threshold, self.change_threshold
+                decision,
+                quality_score,
+                change_magnitude,
+                self.quality_threshold,
+                self.change_threshold,
             )
 
             evaluation_result = {
@@ -205,22 +207,16 @@ class QualityGate:
         """
         Convert a state dictionary into a human‑readable string for the LLM.
 
-        Long strings are truncated to 500 characters – the gate only needs a
-        brief view to compute scores, and this keeps the prompt size small.
+        Note: The content is no longer truncated here. It is expected that
+        the input to this function has been intelligently compressed beforehand
+        if necessary.
         """
         if not state:
             return "No state available"
 
         formatted_parts = []
         for key, value in state.items():
-            if isinstance(value, str):
-                # Truncate very long text to keep the prompt size reasonable.
-                display_value = (
-                    value[:500] + "..." if len(value) > 500 else value
-                )
-                formatted_parts.append(f"{key}: {display_value}")
-            else:
-                formatted_parts.append(f"{key}: {str(value)}")
+            formatted_parts.append(f"{key}: {str(value)}")
 
         return "\n".join(formatted_parts)
 
@@ -290,9 +286,9 @@ class QualityGate:
             # Find the first occurrence of a keyword followed by a colon/dash
             # and capture the rest of the line (or multiline).
             reasoning_patterns = [
-                r"reasoning[:\-]?\s*(.+?)(?:\n|$)",
-                r"because[:\-]?\s*(.+?)(?:\n|$)",
-                r"decision[:\-]?\s*(.+?)(?:\n|$)",
+                r"Reasoning[:\\-]?\\s*(.+)", # Capture everything after "Reasoning:"
+                r"because[:\\-]?\\s*(.+?)(?:\\n|$)",
+                r"decision[:\\-]?\\s*(.+?)(?:\\n|$)",
             ]
             for pattern in reasoning_patterns:
                 reasoning_match = re.search(

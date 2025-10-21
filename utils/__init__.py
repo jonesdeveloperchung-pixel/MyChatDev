@@ -1,1 +1,3 @@
-# Utils module
+# Utility module
+
+# Author: Jones Chung

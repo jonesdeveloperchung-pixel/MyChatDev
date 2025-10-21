@@ -1,53 +1,31 @@
 graph TD
-    subgraph Roles
-        A[Human Operator] --> PM(Product Manager)
-        PM --> ARCH(Architect)
-        ARCH --> PROG(Programmer)
-        PROG --> TEST(Tester)
-        TEST --> REV(Reviewer/Debugger)
-        REV --> PROG
+    subgraph "Phase 1: Strategic Planning"
+        direction LR
+        A[Human Operator] --> P1(Requirements Analysis);
+        P1 --> P2(System Design);
+        M[Experience/Memory] --> P1;
+        P2 --> HIOptional{"(Optional) Human Approval"};
     end
 
-    subgraph Phases
-        P1(Requirement Analysis)
-        P2(System Design)
-        P3(Code Implementation)
-        P4(Testing & Debugging)
-        P5(Refinement & Review)
-        P6(Output Generation)
-        END((Process Complete))
+    HIOptional --> Sandbox(Phase 2: Sandboxed Development);
+
+    subgraph "Internal Sandbox Loop (Abstracted)"
+        direction TB
+        Sandbox -- "Input: Design, Tests" --> InternalLoop(Code → Compile → Test → Debug);
+        InternalLoop -- "Repeats until tests pass" --> InternalLoop;
+        InternalLoop -- "Output: Validated Code" --> Review;
     end
 
-    subgraph Data Flow
-        D1[User Prompt/Requirements] --> P1
-        D2[Company Configuration] --> P1
-        D3[External Data] --> P1
-        D4[Experience/Memory] --> P1
+    Review(Phase 3: Holistic Review) --> QG;
 
-        %% Outputs from each phase
-        P1 -->|Requirements Spec| QA1(QA: Req Review) --> P2
-        P2 -->|Design Docs| QA2(QA: Design Review) --> P3
-        P3 -->|Executable Code| QA3(QA: Code Review) --> P4
-        P4 -->|QA Report| QA4(QA: Test Validation) --> P5
-        P5 -->|Refined Code| P3
-        P5 -->|Release Package| P6
-        P6 -->|Deliverables| END
-
-        %% Final artifacts
-        P6 --> D5[Source Code]
-        P6 --> D6[Design Documents]
-        P6 --> D7[Test Reports]
-        P6 --> D8[Logs - Warehouse]
-        P6 --> D9[Documentation]
-        P6 --> D4(Updated Experience/Memory)
+    subgraph "Phase 4: Adaptive Quality & Refinement"
+        direction TB
+        QG(A. Quality Gate Evaluation);
+        QG -- "Quality Stagnated" --> Reflect(B. Reflector Agent);
+        Reflect -- "New Strategy" --> P1;
+        QG -- "Quality Improving" --> P1;
+        QG -- "Quality Threshold Met" --> Done((✅ Deliverables Ready));
+        Done --> M;
     end
 
-    %% Orchestration
-    PM -- orchestrates --> P1
-    ARCH -- orchestrates --> P2
-    PROG -- orchestrates --> P3
-    TEST -- orchestrates --> P4
-    REV -- assists --> P4
-    REV -- assists --> P5
-    P5 -- feedback loop --> P1
-    P6 -- delivers --> A
+    style Sandbox fill:#f9f,stroke:#333,stroke-width:2px

@@ -4,13 +4,17 @@ A Python program that enables cooperative interaction between multiple locally h
 
 ## 🏗️ Architecture
 
-The system implements a software development workflow where different LLMs take on specialized roles:
+The system implements a **Multi-Layered Validation Workflow** where different LLMs take on specialized roles, orchestrated through a **graph-based state machine using LangGraph**. The key to this architecture is a series of fast, iterative loops that validate the work at each stage, including a sandboxed environment for code development and a reflective mechanism for overcoming stagnation.
 
-- **Product Manager** (gemma3:4b) - Requirements analysis
-- **System Architect** (phi4:14b) - System design  
-- **Programmer** (qwen2.5-coder) - Code implementation
-- **Tester** (deepseek-coder:6.7b) - Testing and validation
-- **Code Reviewer** (llama3.2) - Quality review and feedback
+### Agent Roles
+- **Product Manager**: Analyzes initial requirements and consults the system's **Experience/Memory**.
+- **System Architect**: Creates the high-level technical design.
+- **Tester**: Generates unit tests and **executes them within a sandboxed environment** to validate the code.
+- **Programmer**: A **tool-using agent** that works within a sandboxed environment to write, compile, and test code until it passes the required checks, incorporating feedback from the Tester and Reviewer.
+- **Code Reviewer**: Performs a holistic review of the validated code for logic, style, and maintainability, providing actionable feedback.
+- **Quality Gate**: A system agent that performs a rubric-based quality assessment and **adaptively decides whether to halt, continue, or trigger reflection**.
+- **Reflector**: A system agent that performs root-cause analysis when the workflow stagnates and proposes **strategic guidance**.
+- **Distiller**: A system agent that intelligently compresses content to preserve context.
 
 ## 📁 Project Structure
 
@@ -24,13 +28,17 @@ MyChatDev/
 ├── models/
 │   └── llm_manager.py        # LLM communication and management
 ├── workflow/
-│   ├── graph_nodes.py        # LangGraph node implementations
+│   ├── graph_workflow.py     # LangGraph node implementations and workflow orchestration
+│   ├── sandbox.py            # Sandboxed execution environment for Programmer agent
 │   └── quality_gate.py       # Quality control and gatekeeper
 ├── utils/
 │   ├── logging_config.py     # Logging configuration
 │   └── prompts.py           # Centralized prompt management
 └── tests/
     └── test_llm_manager.py   # Unit tests
+    └── test_sandbox.py       # Unit tests for Sandbox
+    └── test_graph_workflow.py # Unit tests for GraphWorkflow
+    └── test_quality_gate.py  # Unit tests for QualityGate
 ```
 
 ## 🚀 Installation
@@ -56,12 +64,12 @@ MyChatDev/
 
 ```python
 import asyncio
-from workflow.simple_workflow import SimpleCooperativeLLM
+from workflow.graph_workflow import GraphWorkflow # Updated import
 from config.settings import DEFAULT_CONFIG
 
 async def main():
     # Initialize workflow
-    workflow = SimpleCooperativeLLM(DEFAULT_CONFIG)
+    workflow = GraphWorkflow(DEFAULT_CONFIG) # Updated class
     
     # Define your requirements
     user_input = """
@@ -76,9 +84,12 @@ async def main():
     final_state = await workflow.run(user_input)
     
     # Access deliverables
-    print("Requirements:", final_state.requirements)
-    print("Design:", final_state.design)
-    print("Code:", final_state.code)
+    print("Requirements:", final_state.deliverables['requirements'])
+    print("Design:", final_state.deliverables['design'])
+    print("Code:", final_state.deliverables['code'])
+    print("Test Results:", final_state.deliverables['test_results'])
+    print("Review Feedback:", final_state.deliverables['review_feedback'])
+    print("Strategic Guidance:", final_state.deliverables['strategic_guidance'])
 
 asyncio.run(main())
 ```
@@ -93,46 +104,82 @@ python main.py
 
 ### LLM Model Assignment
 
-Edit `config/settings.py` to customize model assignments:
+Edit `config/llm_profiles.py` to customize model assignments. For best performance, use a mix of powerful models for complex tasks and smaller, faster models for analytical tasks.
+
+You can select a profile using the `-P` or `--profile` command-line argument in `cli.py`. Available profiles include: `high_reasoning` (default), `medium_reasoning`, `low_reasoning`, `gemma3_phi4_gpt`, `gpt_oss`, `llama32`, `lightweight`, and `compliance`.
+
+Example:
+```bash
+python cli.py -P low_reasoning -U prompts/my_prompt.txt
+```
+
+The structure of a profile in `config/llm_profiles.py` is a dictionary mapping role names to `LLMConfig` objects. Each `LLMConfig` specifies the model ID, temperature, and other parameters for a particular role.
 
 ```python
-AVAILABLE_LLMS = {
+# Example of a profile (from config/llm_profiles.py)
+LLM_CONFIGS_HIGH_REASONING: Dict[str, LLMConfig] = {
     "product_manager": LLMConfig(
         name="Product Manager",
-        model_id="gemma3:4b",  # Change to your preferred model
+        model_id="gemma3:12b",  # balance of reasoning + efficiency
         role="product_manager",
-        temperature=0.3
+        temperature=0.4,  # slightly higher for creativity
     ),
-    # ... other roles
+    # ... (other roles) ...
 }
 ```
 
 ### System Parameters
 
+Edit `config/settings.py` to customize system-wide parameters.
+
+Alternatively, you can override these parameters directly from the command line when running `cli.py`.
+
+```bash
+python cli.py --url http://192.168.16.120:11434 --max_iterations 10 --enable_sandbox false --quality_threshold 0.9
+```
+
+Here's an example of the `DEFAULT_CONFIG` structure, which corresponds to the configurable parameters:
+
 ```python
 DEFAULT_CONFIG = SystemConfig(
     ollama_host="http://localhost:11434",
-    max_iterations=5,           # Maximum workflow iterations
-    quality_threshold=0.8,      # Quality score to halt execution
-    change_threshold=0.1,       # Minimum change threshold
-    enable_compression=True,    # Enable message compression
-    compression_threshold=5000, # Characters before compression
-    log_level="INFO"
+    max_iterations=5,
+    quality_threshold=0.8,
+    change_threshold=0.1,
+    log_level="INFO",
+
+    # Sandbox Settings
+    enable_sandbox=True,                # Master switch for the sandboxed development environment
+
+    # Compression Settings
+    enable_compression=True,
+    compression_threshold=8192,         # Content length threshold to trigger compression
+    compression_strategy='progressive_distillation', # 'progressive_distillation' or 'truncate'
+    max_compression_ratio=0.5,          # Prevents over-compression (e.g., 0.5 means compressed size won't be less than 50% of original)
+    compression_chunk_size=8192,        # Size of chunks for progressive distillation
+
+    # Stagnation Detection
+    stagnation_iterations=3,            # Number of iterations to check for stagnation before triggering reflection
+
+    # Human Approval
+    enable_human_approval=False,        # Master switch for the optional human approval step
 )
 ```
 
 ## 🎛️ Quality Gate System
 
-The system includes an intelligent quality gate that monitors:
+The system includes an intelligent quality gate that uses a rubric-based assessment to evaluate the deliverables. Instead of a single score, it rates the output on multiple criteria (e.g., `correctness`, `completeness`, `readability`).
 
-- **Quality Score**: Overall deliverable quality (0-1)
-- **Change Magnitude**: Amount of change between iterations (0-1)
-- **Automatic Halting**: Stops when quality threshold is met or changes are minimal
+- **Rubric-Based Scoring**: Provides detailed, actionable feedback to the agents.
+- **Overall Quality Score**: A weighted average of the rubric scores, used to determine if the quality threshold is met.
+- **Change Magnitude**: Amount of change between iterations (0-1).
+- **Automatic Halting**: Stops when the quality threshold is met or changes are minimal.
 
 ### Quality Gate Behavior
 
-- **HALT** when quality_score ≥ 0.8 OR change_magnitude ≤ 0.1
-- **CONTINUE** otherwise (up to max_iterations)
+- **HALT** when `overall_quality_score` ≥ 0.8 OR `change_magnitude` ≤ 0.1
+- **TRIGGER SELF-CORRECTION** if `overall_quality_score` stagnates for multiple iterations.
+- **CONTINUE** otherwise (up to `max_iterations`).
 
 ## 📊 Logging and Debugging
 
@@ -164,6 +211,7 @@ The system generates:
 - **source_code.py** - Implementation code
 - **test_results.md** - Testing and validation results
 - **review_feedback.md** - Code review feedback
+- **strategic_guidance.md** - Strategic guidance from the Reflector (if triggered)
 - **complete_state.json** - Full workflow state
 
 ## 🧪 Testing
@@ -180,24 +228,56 @@ Run specific test:
 pytest tests/test_llm_manager.py::TestLLMManager::test_generate_response_success
 ```
 
-## 🔄 Workflow Process
+## 📈 Evaluation Metrics
 
-1. **Requirements Analysis** - Product Manager analyzes user input
-2. **System Design** - Architect creates technical design
-3. **Code Implementation** - Programmer writes the code
-4. **Testing & Debugging** - Tester validates implementation
-5. **Review & Refinement** - Reviewer provides feedback
-6. **Quality Gate** - Automated quality assessment
-7. **Output Generation** - Final deliverable compilation
+To systematically evaluate the system's performance and identify areas for improvement, we will track the following key metrics:
 
+- **Success Rate**: The percentage of user prompts that result in a "HALT" decision from the Quality Gate with an `overall_quality_score` above the `quality_threshold`.
+- **Iteration Count**: The number of iterations required to reach a successful "HALT" state. Lower iteration counts indicate higher efficiency.
+- **Code Quality**: Assessed by the `overall_quality_score` from the Quality Gate, which is a weighted average of rubric scores (e.g., correctness, completeness, readability).
+- **Time to Completion**: The total elapsed time from the initial user prompt to the final "HALT" decision.
+- **Stagnation Rate**: The frequency with which the Reflector agent is triggered, indicating how often the system encounters and attempts to overcome stagnation.
+
+## 🔄 Workflow Process: The Multi-Layered Validation Workflow
+
+The system avoids the "all or nothing" approach of a single, long iteration. Instead, it uses a series of nested feedback loops to ensure quality and correctness at each step.
+
+### Phase 1: Strategic Planning
+
+1.  **Requirements Analysis**: The **Product Manager** analyzes the user's prompt, pulling relevant information from the **Experience/Memory** knowledge base. If `strategic_guidance` is available from a previous reflection, it is incorporated here.
+2.  **System Design**: The **System Architect** creates the technical blueprint for the project. If `strategic_guidance` is available, it is incorporated here.
+3.  **Human Approval (Optional)**: If `enable_human_approval` is set to `True`, the high-level plan and design can be presented to a human operator for approval before entering the development phase. The workflow pauses until approval or rejection.
+
+### Phase 2: Sandboxed Development
+
+This phase replaces a simple code generation step with a powerful, self-contained development environment.
+
+1.  **Sandbox Invocation**: A temporary, isolated directory is created and populated with the design documents and unit tests.
+2.  **Iterative Development**: The **Programmer** agent is activated within the sandbox. Its goal is to make the tests pass. It works in a self-correcting loop, incorporating `review_feedback` and `strategic_guidance` if available:
+    *   **Code**: Writes source code (e.g., `main.c`, `main.py`) and build files (e.g., a `Makefile`) using a `write_file` tool.
+    *   **Compile/Execute**: Executes a compiler (e.g., `make` or `gcc`) or interpreter (e.g., `python`) using a `run_shell_command` tool. If it fails, it reads the error, debugs its code, and retries.
+    *   **Test**: Once the code compiles/executes, it runs the unit tests (e.g., `pytest`). If they fail, it reads the failure logs, debugs its code, and retries the compile-and-test cycle.
+3.  **Submission**: Once all tests pass, the agent calls a special `submit_deliverable` tool, and the validated code is passed to the next phase.
+
+### Phase 3: Holistic Review and Refinement
+
+Once the Sandboxed Development phase produces code that is syntactically valid and passes all unit tests, it moves to the outer loop for a holistic review.
+
+1.  **Test Generation & Execution**: The **Tester** agent generates a suite of unit tests based on the system design and code, and then **executes these tests within the sandbox**. The results are used to validate the implementation.
+2.  **Code Review**: The **Code Reviewer** assesses the code for broader qualities like logic, efficiency, and maintainability, providing `review_feedback`.
+3.  **Adaptive Quality Gate**: The **Quality Gate** agent evaluates the entire project against a detailed rubric.
+    *   **If Quality is Met**: The workflow is complete. The final deliverables are generated, and the **Experience/Memory** is updated with the learnings from the project.
+    *   **If Quality Stagnates**: The **Reflector** agent is triggered to perform root-cause analysis and propose `strategic_guidance`, which is then fed into the next iteration (starting back at Phase 1). Stagnation is detected if the `overall_quality_score` does not significantly improve over `stagnation_iterations`.
+    *   **If Quality Improves but not Met**: The detailed feedback is passed to the agents for the next full iteration, starting back at Phase 1.
 ## 🎨 Design Principles
 
-- **Modularity**: Clear separation of concerns
-- **Extensibility**: Easy to add new LLMs and workflows
-- **Loose Coupling**: Minimal dependencies between components
-- **Single Responsibility**: Each module has one clear purpose
-- **Error Resilience**: Comprehensive error handling
-- **Observability**: Detailed logging and monitoring
+- **Multi-Layered Validation**: Catch errors early and often with nested feedback loops (immediate sanity checks, static analysis, unit tests, and a final quality gate).
+- **Ground-Truth Validation**: Ground LLMs in reality by integrating external, non-AI tools like compilers, linters, and test runners.
+- **Fail Fast, Retry Fast**: Use small, rapid inner loops (e.g., the Development Sub-Loop) to fix technical errors, reserving expensive, full-iteration loops for strategic changes.
+- **Actionable, Rubric-Based Feedback**: Provide specific, structured feedback to agents rather than a single, generic score.
+- **Right Tool for the Job**: Use a heterogeneous mix of models—large models for complex reasoning and smaller, faster models for analytical and constrained tasks.
+- **Configurability**: Avoid hardcoded values; all agent models and key parameters should be user-configurable.
+- **Observability**: Maintain detailed logging for debugging and performance analysis.
 
 ## 🔧 Extending the System
 
@@ -217,7 +297,7 @@ pytest tests/test_llm_manager.py::TestLLMManager::test_generate_response_success
    NEW_ROLE = """Your role-specific prompt template..."""
    ```
 
-3. **Create Node Function** in `workflow/graph_nodes.py`:
+3. **Create Node Function** in `workflow/graph_workflow.py`:
    ```python
    async def new_role_node(self, state: WorkflowState) -> WorkflowState:
        # Implementation
@@ -246,12 +326,22 @@ def custom_quality_check(self, state: WorkflowState) -> float:
 
 2. **Connection Error**
    - Ensure Ollama is running: `ollama serve`
-   - Check host configuration in settings
+   - Check host configuration in settings (or use `--url` CLI argument)
 
-3. **Memory Issues**
-   - Enable compression: `enable_compression=True`
-   - Reduce `compression_threshold`
-   - Use smaller models for non-critical roles
+3. **Memory Issues / Ollama Runner Crashes**
+   - This can manifest as `llama runner process has terminated` errors.
+   - Ensure your system has sufficient RAM for the models you are running.
+   - Try using smaller models (e.g., with the `low_reasoning` profile).
+   - Restart your Ollama server.
+   - Enable compression: `enable_compression=True` in `config/settings.py` (or via CLI).
+   - Reduce `compression_threshold` in `config/settings.py` (or via CLI).
+   - Use smaller models for non-critical roles.
+
+4. **Graph Recursion Limit Reached**
+   - This can manifest as `GraphRecursionError: Recursion limit of X reached`.
+   - This indicates the workflow is iterating too many times without reaching a stop condition.
+   - You can increase the limit by setting the `recursion_limit` config key (though this is not directly exposed via CLI yet).
+   - More importantly, analyze the logs and deliverables to understand why the workflow is not progressing or halting. This often points to issues with agent prompts or quality gate logic.
 
 ### Performance Optimization
 

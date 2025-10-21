@@ -1,0 +1,4 @@
+Implement a simple C program that reverses a given string.
+Include a Makefile for:
+- Compiling the program
+- Running unit tests for the string reversal function

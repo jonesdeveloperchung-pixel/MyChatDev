@@ -52,7 +52,9 @@ async def test_basic_functionality() -> bool:
 
         # Verify that the LLM manager can reach the required model
         logger.info("Testing LLM Manager...")
-        models_available = await workflow.llm_manager.check_model_availability("gemma3:4b")
+        models_available = await workflow.llm_manager.check_model_availability(
+            "gemma3:4b"
+        )
         logger.info(f"Model gemma3:4b available: {models_available}")
 
         if models_available:
@@ -75,7 +77,9 @@ async def test_basic_functionality() -> bool:
         else:
             # Skip the full run if the model isn't available
             logger.warning("Required models not available - skipping full test")
-            print("⚠️  Models not available - please ensure Ollama is running with required models")
+            print(
+                "⚠️  Models not available - please ensure Ollama is running with required models"
+            )
             return False
 
     except Exception as e:

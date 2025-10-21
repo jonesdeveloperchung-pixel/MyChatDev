@@ -1,61 +1,50 @@
-"""Configuration settings for the cooperative LLM system."""
+"""Configuration settings for the cooperative LLM system.
+
+Author: Jones Chung
+"""
 
 from typing import Dict, List
+from pathlib import Path
 from pydantic import BaseModel
 
 
 class LLMConfig(BaseModel):
     """Configuration for individual LLM models."""
+    model_config = {'protected_namespaces': ()}
+
     name: str
     model_id: str
     role: str
     temperature: float = 0.7
-    max_tokens: int = 65536 # Adjust based on model capabilities
+    max_tokens: int = 131072  # Adjust based on model capabilities
 
 
 class SystemConfig(BaseModel):
     """System-wide configuration."""
-    ollama_host: str = "http://localhost:11434"
+
+    ollama_host: str = "http://localhost:11434"  # Default Ollama server address
     max_iterations: int = 5
     quality_threshold: float = 0.8
     change_threshold: float = 0.1
-    enable_compression: bool = True
-    compression_threshold: int = 32768  # Tokens
     log_level: str = "INFO"
+    deliverables_path: Path = Path("deliverables")
 
-# Available LLM configurations based on your Ollama models
-AVAILABLE_LLMS: Dict[str, LLMConfig] = {
-    "product_manager": LLMConfig(
-        name="Product Manager",
-        model_id="gemma3:12b",
-        role="product_manager",
-        temperature=0.3
-    ),
-    "architect": LLMConfig(
-        name="System Architect", 
-        model_id="phi4:14b",
-        role="architect",
-        temperature=0.2
-    ),
-    "programmer": LLMConfig(
-        name="Programmer",
-        model_id="gpt-oss:20b",
-        role="programmer", 
-        temperature=0.1
-    ),
-    "tester": LLMConfig(
-        name="Tester",
-        model_id="mistral:7b",
-        role="tester",
-        temperature=0.2
-    ),
-    "reviewer": LLMConfig(
-        name="Code Reviewer",
-        model_id="phi4:14b", 
-        role="reviewer",
-        temperature=0.3
-    )
-}
+    # Sandbox Settings
+    enable_sandbox: bool = True
+
+    # Compression Settings
+    enable_compression: bool = True
+    compression_threshold: int = 8192
+    compression_strategy: str = 'progressive_distillation'
+    max_compression_ratio: float = 0.5
+    compression_chunk_size: int = 8192
+
+    # Stagnation Detection
+    stagnation_iterations: int = 3 # Number of iterations to check for stagnation
+
+    # Human Approval
+    enable_human_approval: bool = False # Master switch for human approval step
+
 
 # Default system configuration
 DEFAULT_CONFIG = SystemConfig()

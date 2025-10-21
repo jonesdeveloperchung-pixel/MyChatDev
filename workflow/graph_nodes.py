@@ -21,22 +21,25 @@ from config.settings import AVAILABLE_LLMS, DEFAULT_CONFIG
 from utils.prompts import get_prompt
 from utils.logging_config import log_node_execution
 
+
 # --------------------------------------------------------------------------- #
 # TypedDict that defines the shape of the state that flows through the graph.
 # Every node receives the current state, mutates it and returns the updated state.
 # --------------------------------------------------------------------------- #
 class WorkflowState(TypedDict):
     """State management for the workflow."""
-    user_input: str               # Original user prompt
-    requirements: str            # Product‑manager output
-    design: str                  # Architect design
-    code: str                    # Programmer source code
-    test_results: str            # Tester results
-    review_feedback: str         # Reviewer comments
-    deliverables: Dict[str, str] # Mapping of deliverable name → text
-    iteration_count: int         # How many iterations have been run
-    quality_evaluations: list    # List of dicts with each quality‑gate evaluation
-    should_halt: bool            # Flag set by the quality gate
+
+    user_input: str  # Original user prompt
+    requirements: str  # Product‑manager output
+    design: str  # Architect design
+    code: str  # Programmer source code
+    test_results: str  # Tester results
+    review_feedback: str  # Reviewer comments
+    deliverables: Dict[str, str]  # Mapping of deliverable name → text
+    iteration_count: int  # How many iterations have been run
+    quality_evaluations: list  # List of dicts with each quality‑gate evaluation
+    should_halt: bool  # Flag set by the quality gate
+
 
 # --------------------------------------------------------------------------- #
 # Main graph class – instantiates sub‑components, builds the graph and provides
@@ -54,9 +57,7 @@ class CooperativeLLMGraph:
 
         # Quality gate uses two thresholds: a minimum score and a change‑threshold
         self.quality_gate = QualityGate(
-            self.llm_manager,
-            config.quality_threshold,
-            config.change_threshold
+            self.llm_manager, config.quality_threshold, config.change_threshold
         )
 
         self.logger = logging.getLogger("coop_llm.graph")
@@ -87,7 +88,10 @@ class CooperativeLLMGraph:
         # Define deterministic edges – the workflow proceeds linearly.
         # ------------------------------------------------------------------- #
         workflow.add_edge("requirements_analysis", "system_design")
-        workflow.add_edge("system_design"  + "review_refinement", "code_implementation", )
+        workflow.add_edge(
+            "system_design" + "review_refinement",
+            "code_implementation",
+        )
         workflow.add_edge("code_implementation", "testing_debugging")
         workflow.add_edge("testing_debugging", "review_refinement")
         workflow.add_edge("review_refinement", "quality_gate")
@@ -102,8 +106,8 @@ class CooperativeLLMGraph:
             {
                 # "continue": "requirements_analysis",
                 "continue": "system_design",
-                "halt": "output_generation"
-            }
+                "halt": "output_generation",
+            },
         )
 
         # ------------------------------------------------------------------- #
@@ -139,14 +143,17 @@ class CooperativeLLMGraph:
         prompt = get_prompt(
             "product_manager",
             user_input=state["user_input"],
-            context=f"Iteration: {state['iteration_count']}"
+            context=f"Iteration: {state['iteration_count']}",
         )
 
         try:
             response = await self.llm_manager.generate_response(llm_config, prompt)
 
             # Optional compression – useful when the LLM output is huge.
-            if self.config.enable_compression and len(response) > self.config.compression_threshold:
+            if (
+                self.config.enable_compression
+                and len(response) > self.config.compression_threshold
+            ):
                 response = await self.llm_manager.compress_content(response)
 
             # Persist the results in the state and in the deliverables map
@@ -159,7 +166,7 @@ class CooperativeLLMGraph:
                 "Requirements Analysis",
                 {"user_input": state["user_input"]},
                 {"requirements": response},
-                execution_time
+                execution_time,
             )
         except Exception as e:
             self.logger.error(f"Error in requirements analysis: {e}")
@@ -178,13 +185,16 @@ class CooperativeLLMGraph:
         prompt = get_prompt(
             "architect",
             requirements=state.requirements,
-            context=f"Iteration: {state.iteration_count}"
+            context=f"Iteration: {state.iteration_count}",
         )
 
         try:
             response = await self.llm_manager.generate_response(llm_config, prompt)
 
-            if self.config.enable_compression and len(response) > self.config.compression_threshold:
+            if (
+                self.config.enable_compression
+                and len(response) > self.config.compression_threshold
+            ):
                 response = await self.llm_manager.compress_content(response)
 
             state["design"] = response
@@ -196,7 +206,7 @@ class CooperativeLLMGraph:
                 "System Design",
                 {"requirements": state.requirements},
                 {"design": response},
-                execution_time
+                execution_time,
             )
         except Exception as e:
             self.logger.error(f"Error in system design: {e}")
@@ -215,13 +225,16 @@ class CooperativeLLMGraph:
         prompt = get_prompt(
             "programmer",
             design=state.design,
-            context=f"Iteration: {state.iteration_count}"
+            context=f"Iteration: {state.iteration_count}",
         )
 
         try:
             response = await self.llm_manager.generate_response(llm_config, prompt)
 
-            if self.config.enable_compression and len(response) > self.config.compression_threshold:
+            if (
+                self.config.enable_compression
+                and len(response) > self.config.compression_threshold
+            ):
                 response = await self.llm_manager.compress_content(response)
 
             state["code"] = response
@@ -233,7 +246,7 @@ class CooperativeLLMGraph:
                 "Code Implementation",
                 {"design": state.design},
                 {"code": response},
-                execution_time
+                execution_time,
             )
         except Exception as e:
             self.logger.error(f"Error in code implementation: {e}")
@@ -253,13 +266,16 @@ class CooperativeLLMGraph:
             "tester",
             code=state.code,
             requirements=state.requirements,
-            context=f"Iteration: {state.iteration_count}"
+            context=f"Iteration: {state.iteration_count}",
         )
 
         try:
             response = await self.llm_manager.generate_response(llm_config, prompt)
 
-            if self.config.enable_compression and len(response) > self.config.compression_threshold:
+            if (
+                self.config.enable_compression
+                and len(response) > self.config.compression_threshold
+            ):
                 response = await self.llm_manager.compress_content(response)
 
             state["test_results"] = response
@@ -271,7 +287,7 @@ class CooperativeLLMGraph:
                 "Testing & Debugging",
                 {"code": state.code, "requirements": state.requirements},
                 {"test_results": response},
-                execution_time
+                execution_time,
             )
         except Exception as e:
             self.logger.error(f"Error in testing: {e}")
@@ -288,18 +304,23 @@ class CooperativeLLMGraph:
 
         llm_config = AVAILABLE_LLMS["reviewer"]
         # Turn the deliverables dict into a plain string to feed into the prompt
-        deliverables_text = "\n\n".join([f"{k}: {v}" for k, v in state.deliverables.items()])
+        deliverables_text = "\n\n".join(
+            [f"{k}: {v}" for k, v in state.deliverables.items()]
+        )
 
         prompt = get_prompt(
             "reviewer",
             deliverables=deliverables_text,
-            context=f"Iteration: {state.iteration_count}"
+            context=f"Iteration: {state.iteration_count}",
         )
 
         try:
             response = await self.llm_manager.generate_response(llm_config, prompt)
 
-            if self.config.enable_compression and len(response) > self.config.compression_threshold:
+            if (
+                self.config.enable_compression
+                and len(response) > self.config.compression_threshold
+            ):
                 response = await self.llm_manager.compress_content(response)
 
             state["review_feedback"] = response
@@ -311,7 +332,7 @@ class CooperativeLLMGraph:
                 "Review & Refinement",
                 {"deliverables": deliverables_text},
                 {"review_feedback": response},
-                execution_time
+                execution_time,
             )
         except Exception as e:
             self.logger.error(f"Error in review: {e}")
@@ -360,7 +381,7 @@ class CooperativeLLMGraph:
                 "Quality Gate",
                 {"current_state": current_state_snapshot},
                 {"evaluation": evaluation},
-                execution_time
+                execution_time,
             )
         except Exception as e:
             self.logger.error(f"Error in quality gate: {e}")
@@ -395,7 +416,7 @@ class CooperativeLLMGraph:
             "Output Generation",
             {"iteration_count": state.iteration_count},
             {"final_deliverables": list(final_deliverables.keys())},
-            execution_time
+            execution_time,
         )
 
         self.logger.info("🎉 WORKFLOW COMPLETED SUCCESSFULLY")

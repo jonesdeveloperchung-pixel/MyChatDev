@@ -3,6 +3,8 @@
 """
 Main entry point for the Cooperative LLM System.
 
+Author: Jones Chung
+
 Improvements added:
     * -U/--user_prompt: read the prompt from a file (unchanged).
     * -P/--profile      : choose a model profile from the mapping
@@ -19,11 +21,13 @@ from pathlib import Path
 from datetime import datetime
 
 # ---------- Import everything that the original script needs ----------
-from workflow.simple_workflow import SimpleCooperativeLLM, WorkflowState
-from config.settings import DEFAULT_CONFIG
+from workflow.graph_workflow import GraphWorkflow, GraphState
+from config.settings import DEFAULT_CONFIG, SystemConfig
 from utils.logging_config import setup_logging
 from config.llm_profiles import AVAILABLE_LLMS_BY_PROFILE
+
 # ------------------------------------------------- END IMPORTS ------------------------------------------------ #
+
 
 # ---------- Default prompt (kept identical to the original hard‑coded string) ----------
 DEFAULT_USER_PROMPT: str = """
@@ -32,14 +36,15 @@ Design and implement a bootable, modular Real‑Time Operating System (RTOS) for
 2. Enforce system‑level rate limiting and access control policies for I/O operations and task scheduling, configurable via external TOML/JSON files
 3. Persist structured telemetry and system logs using an embedded, SQLite‑compatible storage layer optimized for SD card wear‑leveling
 4. Provide robust error handling and kernel‑level logging across all subsystems, including bootloader, scheduler, and device drivers
-5. Support dynamic configuration and modular drivers for Raspberry Pi hardware variants and protocols (e.g., BCM283x series, Pi 4 USB stack)
+5. Support dynamic configuration and modular drivers for Raspberry Pi hardware variants and protocols (e.g., BCM283x series, Pi 4 USB stack)
 The RTOS must be bootable from the Raspberry Pi firmware (via `bootcode.bin` and `config.txt`), include a minimal Assembly bootloader to initialize the MMU and stack, and launch a Rust‑based kernel with C interop support. The system should be production‑ready, featuring onboarding‑friendly documentation, integration tests, and reproducible builds via cross‑compilation and QEMU emulation.
 """
 # -------------------------------------------------------------------------------- #
 
+
 # ---------- Helper: read prompt from file ----------
 def _read_prompt_from_file(file_path: Path) -> str:
-    """Read and return the entire contents of *file_path*."""
+    """Read and return the entire contents of *file_path*. """
     try:
         content = file_path.read_text(encoding="utf-8")
         # ---- DEBUG --------------------------------------------------------------
@@ -48,7 +53,10 @@ def _read_prompt_from_file(file_path: Path) -> str:
         return content
     except Exception as exc:
         raise RuntimeError(f"Failed to read prompt file '{file_path}': {exc}") from exc
+
+
 # -------------------------------------------------------------------------------- #
+
 
 # ---------- Helper: save deliverables (unchanged but with comments) ----------
 async def save_deliverables(state, output_dir: Path):
@@ -78,8 +86,8 @@ async def save_deliverables(state, output_dir: Path):
     }
     # 4. Write each deliverable.
     for filename, content in deliverable_files.items():
-        if content:                     # skip empty sections
-            file_path = timestamp_dir / filename   # <-- correct path
+        if content:  # skip empty sections
+            file_path = timestamp_dir / filename  # <-- correct path
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(content)
     # 5. Dump the whole state to a JSON file for later inspection.
@@ -95,21 +103,26 @@ async def save_deliverables(state, output_dir: Path):
         json.dump(state_data, f, indent=2, ensure_ascii=False)
     # Return the directory that now contains the files and the timestamp used.
     return timestamp_dir, timestamp
+
+
 # -------------------------------------------------------------------------------- #
+
 
 # ---------- Main ---------------------------------------------------------------- #
 # NOTE: We now *accept* an explicit ``llm_configs`` dictionary.  This is the
 # key to making the profile switch actually work.
-async def main(user_input: str, llm_configs: dict) -> WorkflowState:
+async def main(user_input: str, llm_configs: dict, system_config: SystemConfig) -> GraphState:
     """Main execution function."""
     # Setup logging (this will respect ``--debug`` later on)
-    logger = setup_logging(DEFAULT_CONFIG.log_level)
+    logger = setup_logging(system_config.log_level) # Use system_config.log_level
     logger.info("=== COOPERATIVE LLM SYSTEM STARTUP ===")
 
     # ---- DEBUG --------------------------------------------------------------
     print("\n[DEBUG] User prompt starts with:")
     print(user_input[:200] + ("..." if len(user_input) > 200 else ""))
-    print(f"[DEBUG] Selected profile: {list(llm_configs.keys())[0] if llm_configs else 'N/A'}")
+    print(
+        f"[DEBUG] Selected profile: {list(llm_configs.keys())[0] if llm_configs else 'N/A'}"
+    )
     # Log the whole config mapping for manual inspection
     for role, cfg in llm_configs.items():
         print(f"[DEBUG]  Role '{role}': model={cfg.model_id}  temp={cfg.temperature}")
@@ -118,10 +131,18 @@ async def main(user_input: str, llm_configs: dict) -> WorkflowState:
     try:
         # Initialise and run workflow
         #   * Pass the chosen llm_configs to the workflow
-        workflow = SimpleCooperativeLLM(DEFAULT_CONFIG, llm_configs)
+        workflow = GraphWorkflow(system_config, llm_configs) # Pass system_config
         logger.info(f"Starting workflow with input: {user_input[:100]}...")
         # Execute workflow
-        final_state = await workflow.run(user_input)
+        final_state_dict = await workflow.run(user_input)
+
+        # HACK: Convert dict to a temporary object to maintain compatibility with save_deliverables
+        class TempState:
+            def __init__(self, **entries):
+                self.__dict__.update(entries)
+
+        final_state = TempState(**final_state_dict)
+
         # Save deliverables
         output_dir = Path("deliverables")
         saved_dir, timestamp = await save_deliverables(final_state, output_dir)
@@ -139,11 +160,14 @@ async def main(user_input: str, llm_configs: dict) -> WorkflowState:
         print(f"📁 Deliverables saved to: {saved_dir}")
         print(f"🔄 Iterations: {final_state.iteration_count}")
         print("=" * 60)
-        return final_state
+        return final_state_dict
     except Exception as exc:
         logger.error(f"Fatal error in main execution: {exc}")
         raise
+
+
 # -------------------------------------------------------------------------------- #
+
 
 # ---------- CLI entry point ----------------------------------------------------- #
 def _build_arg_parser() -> argparse.ArgumentParser:
@@ -167,7 +191,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "--profile",
         type=str,
         choices=AVAILABLE_LLMS_BY_PROFILE.keys(),
-        default="optimized",
+        default="high_reasoning",
         help=(
             "Select which LLM profile to use.  Each profile bundles a set of "
             "model IDs, temperatures, etc."
@@ -179,8 +203,55 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Turn on extra diagnostic output (prints, timestamps, etc.)",
     )
+    # ---- OLLAMA HOST OPTION ----------------------------------------
+    parser.add_argument(
+        "--url",
+        type=str,
+        default=DEFAULT_CONFIG.ollama_host,
+        help="URL of the Ollama host.",
+    )
     # ---------------------------------------------------------------
+    
+    # ---- SYSTEM CONFIGURATION OPTIONS ------------------------------
+    parser.add_argument(
+        "--enable_sandbox",
+        type=lambda x: x.lower() == 'true', # Convert string to boolean
+        default=DEFAULT_CONFIG.enable_sandbox,
+        help="Enable or disable the sandboxed development environment.",
+    )
+    parser.add_argument(
+        "--max_iterations",
+        type=int,
+        default=DEFAULT_CONFIG.max_iterations,
+        help="Maximum number of iterations for the workflow.",
+    )
+    parser.add_argument(
+        "--quality_threshold",
+        type=float,
+        default=DEFAULT_CONFIG.quality_threshold,
+        help="Quality score threshold for the Quality Gate to halt.",
+    )
+    parser.add_argument(
+        "--change_threshold",
+        type=float,
+        default=DEFAULT_CONFIG.change_threshold,
+        help="Change magnitude threshold for the Quality Gate to halt (stagnation).",
+    )
+    parser.add_argument(
+        "--stagnation_iterations",
+        type=int,
+        default=DEFAULT_CONFIG.stagnation_iterations,
+        help="Number of iterations to check for stagnation before triggering reflection.",
+    )
+    parser.add_argument(
+        "--enable_human_approval",
+        type=lambda x: x.lower() == 'true', # Convert string to boolean
+        default=DEFAULT_CONFIG.enable_human_approval,
+        help="Enable or disable the optional human approval step.",
+    )
+    # --------------------------------------------------------------- 
     return parser
+
 
 if __name__ == "__main__":
     parser = _build_arg_parser()
@@ -190,6 +261,12 @@ if __name__ == "__main__":
     print("\n[DEBUG] CLI parsed arguments:")
     print(f"  user_prompt  = {args.user_prompt}")
     print(f"  profile      = {args.profile}")
+    print(f"  enable_sandbox = {args.enable_sandbox}")
+    print(f"  max_iterations = {args.max_iterations}")
+    print(f"  quality_threshold = {args.quality_threshold}")
+    print(f"  change_threshold = {args.change_threshold}")
+    print(f"  stagnation_iterations = {args.stagnation_iterations}")
+    print(f"  enable_human_approval = {args.enable_human_approval}")
     # --------------------------------------------------------------------------- #
 
     # Resolve the user prompt
@@ -202,8 +279,27 @@ if __name__ == "__main__":
     llm_configs = AVAILABLE_LLMS_BY_PROFILE[args.profile]
     AVAILABLE_LLMS = llm_configs  # <-- make it globally visible
     # ---- DEBUG --------------------------------------------------------------
-    print(f"[DEBUG] Using profile '{args.profile}'.  Number of roles = {len(llm_configs)}")
+    print(
+        f"[DEBUG] Using profile '{args.profile}'.  Number of roles = {len(llm_configs)}"
+    )
     # --------------------------------------------------------------------------- #
 
+    # Create a custom SystemConfig based on CLI arguments
+    custom_config = SystemConfig(
+        ollama_host=args.url, # Use parsed URL
+        max_iterations=args.max_iterations,
+        quality_threshold=args.quality_threshold,
+        change_threshold=args.change_threshold,
+        log_level=DEFAULT_CONFIG.log_level, # Keep default for now, can be made configurable later
+        enable_sandbox=args.enable_sandbox,
+        enable_compression=DEFAULT_CONFIG.enable_compression, # Keep default for now
+        compression_threshold=DEFAULT_CONFIG.compression_threshold, # Keep default for now
+        compression_strategy=DEFAULT_CONFIG.compression_strategy, # Keep default for now
+        max_compression_ratio=DEFAULT_CONFIG.max_compression_ratio, # Keep default for now
+        compression_chunk_size=DEFAULT_CONFIG.compression_chunk_size, # Keep default for now
+        stagnation_iterations=args.stagnation_iterations,
+        enable_human_approval=args.enable_human_approval,
+    )
+
     # Run the event loop
-    asyncio.run(main(user_input, llm_configs))
+    asyncio.run(main(user_input, llm_configs, custom_config))

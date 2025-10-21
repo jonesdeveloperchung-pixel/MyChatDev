@@ -1,0 +1,39 @@
+# Gitignore for Python projects
+
+# Byte-code files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environment
+venv/
+.venv/
+
+# Environment variables
+.env
+*.env
+
+# IDE-specific files
+.idea/
+.vscode/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Test and coverage reports
+.pytest_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# Distribution and build artifacts
+dist/
+build/
+*.egg-info/
+
+# Project-specific generated files
+logs/
+deliverables/

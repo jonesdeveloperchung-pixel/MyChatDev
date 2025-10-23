@@ -17,7 +17,12 @@ from utils.logging_config import setup_logging
 
 async def save_deliverables(state, output_dir: Path, timestamp: str):
     """Save all deliverables to files."""
-    output_dir.mkdir(exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create a sub‑folder named with the current timestamp
+    # (e.g. 20251004-154609).
+    timestamp_dir = output_dir / timestamp
+    timestamp_dir.mkdir(parents=True, exist_ok=True)
 
     # Save individual deliverables
     deliverable_files = {
@@ -31,7 +36,7 @@ async def save_deliverables(state, output_dir: Path, timestamp: str):
 
     for filename, content in deliverable_files.items():
         if content:
-            file_path = output_dir / f"{timestamp}_{filename}"
+            file_path = timestamp_dir / filename
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(content)
 
@@ -45,11 +50,11 @@ async def save_deliverables(state, output_dir: Path, timestamp: str):
         "timestamp": timestamp,
     }
 
-    state_file = output_dir / f"{timestamp}_complete_state.json"
+    state_file = timestamp_dir / f"{timestamp}_complete_state.json"
     with open(state_file, "w", encoding="utf-8") as f:
         json.dump(state_data, f, indent=2, ensure_ascii=False)
 
-    return output_dir, timestamp
+    return timestamp_dir, timestamp
 
 
 async def main():
@@ -69,7 +74,7 @@ async def main():
     all_results = []
 
     # Define the default profile to use for main.py test cases
-    default_profile = 'high_reasoning' # Or 'medium_reasoning', 'low_reasoning'
+    default_profile = 'Compliance_Focused' # Or 'medium_reasoning', 'low_reasoning'
     llm_configs = AVAILABLE_LLMS_BY_PROFILE[default_profile]
 
     for i, user_input in enumerate(test_cases):
@@ -93,6 +98,7 @@ async def main():
                 stagnation_iterations=DEFAULT_CONFIG.stagnation_iterations,
                 enable_human_approval=DEFAULT_CONFIG.enable_human_approval,
             )
+            logger.debug(f"Custom config for test case {i+1}: {custom_config}")
 
             # Initialize and run workflow
             workflow = GraphWorkflow(custom_config, llm_configs) # Pass custom_config and llm_configs

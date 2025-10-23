@@ -36,7 +36,7 @@ LLM_CONFIGS_GEMMA3_PHI4_GPT: Dict[str, LLMConfig] = {
     ),
     "tester": LLMConfig(
         name="Tester",
-        model_id="mistral:7b",
+        model_id="gemma3:4b",
         role="tester",
         temperature=0.2,
     ),
@@ -48,19 +48,19 @@ LLM_CONFIGS_GEMMA3_PHI4_GPT: Dict[str, LLMConfig] = {
     ),
     "distiller": LLMConfig( # Added
         name="Distiller",
-        model_id="mistral:7b",
+        model_id="gemma3:12b",
         role="distiller",
         temperature=0.2,
     ),
     "reflector": LLMConfig( # Added
         name="Reflector",
-        model_id="mistral:7b",
+        model_id="gemma3:4b",
         role="reflector",
         temperature=0.2,
     ),
     "quality_gate": LLMConfig( # Added
         name="Quality Gate",
-        model_id="mistral:7b",
+        model_id="gemma3:4b",
         role="quality_gate",
         temperature=0.1,
     ),
@@ -198,7 +198,7 @@ LLM_CONFIGS_HIGH_REASONING: Dict[str, LLMConfig] = {
     ),
     "reviewer": LLMConfig(
         name="Code Reviewer",
-        model_id="mistral:7b",  # smaller but precise, good for review
+        model_id="gemma3:4b",  # smaller but precise, good for review
         role="reviewer",
         temperature=0.2,
     ),
@@ -216,7 +216,7 @@ LLM_CONFIGS_HIGH_REASONING: Dict[str, LLMConfig] = {
     ),
     "quality_gate": LLMConfig(
         name="Quality Gate",
-        model_id="mistral:7b",  # A reliable model for scoring and classification
+        model_id="gemma3:4b",  # A reliable model for scoring and classification
         role="quality_gate",
         temperature=0.1,
     ),
@@ -226,49 +226,49 @@ LLM_CONFIGS_HIGH_REASONING: Dict[str, LLMConfig] = {
 LLM_CONFIGS_LIGHTWEIGHT: Dict[str, LLMConfig] = {
     "product_manager": LLMConfig(
         name="Product Manager",
-        model_id="llama3.2:3b",
+        model_id="gemma3:4b", # Replaced llama3.2:3b (1.9GB) with gemma3:4b (3.1GB)
         role="product_manager",
         temperature=0.4,
     ),
     "architect": LLMConfig(
         name="System Architect",
-        model_id="llama3.2:3b",
+        model_id="gemma3:4b", # Replaced llama3.2:3b (1.9GB) with gemma3:4b (3.1GB)
         role="architect",
         temperature=0.2,
     ),
     "programmer": LLMConfig(
         name="Programmer",
-        model_id="deepseek-coder:6.7b",
+        model_id="deepseek-coder:6.7b", # Already >3GB
         role="programmer",
         temperature=0.1,
     ),
     "tester": LLMConfig(
         name="Tester",
-        model_id="tinyllama:latest",
+        model_id="neural-chat:latest", # Replaced tinyllama:latest (608MB) with neural-chat:latest (3.9GB)
         role="tester",
         temperature=0.2,
     ),
     "reviewer": LLMConfig(
         name="Code Reviewer",
-        model_id="neural-chat:latest",
+        model_id="neural-chat:latest", # Already >3GB
         role="reviewer",
         temperature=0.3,
     ),
     "distiller": LLMConfig( # Added
         name="Distiller",
-        model_id="tinyllama:latest",
+        model_id="gemma3:4b", # Replaced tinyllama:latest (608MB) with gemma3:4b (3.1GB)
         role="distiller",
         temperature=0.2,
     ),
     "reflector": LLMConfig( # Added
         name="Reflector",
-        model_id="tinyllama:latest",
+        model_id="neural-chat:latest", # Replaced tinyllama:latest (608MB) with neural-chat:latest (3.9GB)
         role="reflector",
         temperature=0.2,
     ),
     "quality_gate": LLMConfig( # Added
         name="Quality Gate",
-        model_id="tinyllama:latest",
+        model_id="gemma3:4b", # Replaced tinyllama:latest (608MB) with gemma3:4b (3.1GB)
         role="quality_gate",
         temperature=0.1,
     ),
@@ -296,7 +296,7 @@ LLM_CONFIGS_MEDIUM_REASONING: Dict[str, LLMConfig] = {
     ),
     "tester": LLMConfig(
         name="Tester",
-        model_id="mistral:7b", # Upgraded from tinyllama
+        model_id="gemma3:4b", # Upgraded from tinyllama
         role="tester",
         temperature=0.2,
     ),
@@ -320,7 +320,7 @@ LLM_CONFIGS_MEDIUM_REASONING: Dict[str, LLMConfig] = {
     ),
     "quality_gate": LLMConfig(
         name="Quality Gate",
-        model_id="mistral:7b", # Reliable for scoring
+        model_id="gemma3:4b", # Reliable for scoring
         role="quality_gate",
         temperature=0.1,
     ),
@@ -330,49 +330,49 @@ LLM_CONFIGS_MEDIUM_REASONING: Dict[str, LLMConfig] = {
 LLM_CONFIGS_COMPLIANCE: Dict[str, LLMConfig] = {
     "product_manager": LLMConfig(
         name="Product Manager",
-        model_id="granite3-dense:latest",
+        model_id="gpt-oss:20b",  # Strategic generalist
         role="product_manager",
         temperature=0.3,
     ),
     "architect": LLMConfig(
         name="System Architect",
-        model_id="phi4:latest",
+        model_id="phi4:14b",  # Reasoning-heavy, ideal for architecture
         role="architect",
         temperature=0.2,
     ),
     "programmer": LLMConfig(
         name="Programmer",
-        model_id="codegemma:latest",
+        model_id="codegemma:latest",  # Code-specialized
         role="programmer",
         temperature=0.1,
     ),
     "tester": LLMConfig(
         name="Tester",
-        model_id="wizard-math:latest",
+        model_id="gemma3:12b",  # Strong reasoning for edge case detection
         role="tester",
         temperature=0.2,
     ),
     "reviewer": LLMConfig(
         name="Code Reviewer",
-        model_id="solar:latest",
+        model_id="llama3.2:latest",  # Balanced generalist with good comprehension
         role="reviewer",
         temperature=0.3,
     ),
-    "distiller": LLMConfig( # Added
+    "distiller": LLMConfig(
         name="Distiller",
-        model_id="mistral:7b",
+        model_id="mistral:7b",  # Lightweight summarization and synthesis
         role="distiller",
         temperature=0.2,
     ),
-    "reflector": LLMConfig( # Added
+    "reflector": LLMConfig(
         name="Reflector",
-        model_id="mistral:7b",
+        model_id="phi3:latest",  # Compact model for introspection and reflection
         role="reflector",
         temperature=0.2,
     ),
-    "quality_gate": LLMConfig( # Added
+    "quality_gate": LLMConfig(
         name="Quality Gate",
-        model_id="mistral:7b",
+        model_id="gemma3n:e4b",  # Efficient evaluator with enhanced reasoning
         role="quality_gate",
         temperature=0.1,
     ),
@@ -424,7 +424,7 @@ LLM_CONFIGS_LOW_REASONING: Dict[str, LLMConfig] = {
     ),
     "quality_gate": LLMConfig(
         name="Quality Gate",
-        model_id="tinyllama:latest",
+        model_id="gemma3:4b",
         role="quality_gate",
         temperature=0.1,
     ),
@@ -432,12 +432,12 @@ LLM_CONFIGS_LOW_REASONING: Dict[str, LLMConfig] = {
 
 # -------------------  Public mapping -----------------------------------------
 AVAILABLE_LLMS_BY_PROFILE: Dict[str, Dict[str, LLMConfig]] = {
-    "gemma3_phi4_gpt": LLM_CONFIGS_GEMMA3_PHI4_GPT,
-    "gpt_oss": LLM_CONFIGS_GPT_OSS,
-    "llama32": LLM_CONFIGS_LLAMMA32,
-    "high_reasoning": LLM_CONFIGS_HIGH_REASONING,  # Default profile
-    "medium_reasoning": LLM_CONFIGS_MEDIUM_REASONING,
-    "low_reasoning": LLM_CONFIGS_LOW_REASONING,
-    "lightweight": LLM_CONFIGS_LIGHTWEIGHT,
-    "compliance": LLM_CONFIGS_COMPLIANCE,
+    "Advanced_Hybrid": LLM_CONFIGS_GEMMA3_PHI4_GPT,
+    "OpenSource_General": LLM_CONFIGS_GPT_OSS,
+    "Llama_Specialized": LLM_CONFIGS_LLAMMA32,
+    "High_Reasoning": LLM_CONFIGS_HIGH_REASONING,  # Default profile
+    "Medium_Reasoning": LLM_CONFIGS_MEDIUM_REASONING,
+    "Low_Reasoning": LLM_CONFIGS_LOW_REASONING,
+    "Fast_Lightweight": LLM_CONFIGS_LIGHTWEIGHT,
+    "Compliance_Focused": LLM_CONFIGS_COMPLIANCE,
 }

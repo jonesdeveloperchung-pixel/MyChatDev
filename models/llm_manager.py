@@ -41,11 +41,11 @@ class LLMManager:
 
             return is_available
         except Exception as e:
-            self.logger.error(f"Error checking model availability: {e}")
+            self.logger.fatal(f"Error checking model availability: {e}")
             return False
 
     async def generate_response(
-        self, llm_config: LLMConfig, prompt: str, context: Optional[List[Dict]] = None
+        self, llm_config: LLMConfig, messages: List[Dict[str, str]]
     ) -> str:
         """Generate response from specified LLM."""
 
@@ -53,14 +53,14 @@ class LLMManager:
         if not await self.check_model_availability(llm_config.model_id):
             raise ValueError(f"Model {llm_config.model_id} not available")
 
-        # Prepare messages
-        messages = context or []
-        messages.append({"role": "user", "content": prompt})
+        # Prepare messages (already in correct format)
 
         try:
             self.logger.info(
                 f"Generating response with {llm_config.name} ({llm_config.model_id})"
             )
+
+            self.logger.debug(f"messages: {messages}")
 
             response_parts = []
             async for part in await self.client.chat(
@@ -83,7 +83,7 @@ class LLMManager:
             return response
 
         except Exception as e:
-            self.logger.error(f"Error generating response from {llm_config.name}: {e}")
+            self.logger.fatal(f"Error generating response from {llm_config.name}: {e}")
             raise
 
     async def batch_generate(self, requests: List[tuple]) -> Dict[str, str]:
@@ -112,7 +112,7 @@ class LLMManager:
             return results
 
         except Exception as e:
-            self.logger.error(f"Error in batch generation: {e}")
+            self.logger.fatal(f"Error in batch generation: {e}")
             raise
 
     async def compress_content(self, content: str, distiller_config: LLMConfig, max_length: int = 8192) -> str:
@@ -120,12 +120,11 @@ class LLMManager:
         if len(content) <= max_length:
             return content
 
-        from utils.prompts import get_prompt
-
-        prompt = get_prompt("summarizer", content=content, max_length=max_length)
+        prompt_parts = get_prompt("summarizer", main_content=content, max_length=max_length)
+        messages = [{'role': 'user', 'content': prompt_parts["user"]}] # Extract the user part of the prompt
 
         try:
-            summary = await self.generate_response(distiller_config, prompt)
+            summary = await self.generate_response(distiller_config, messages)
             self.logger.info(
                 f"Compressed content from {len(content)} to {len(summary)} characters"
             )
@@ -157,23 +156,25 @@ class LLMManager:
 
             async def invoke(self, messages: List[Any]): # Changed type hint to Any for flexibility
                 # Extract the latest user message for the prompt
-                prompt = messages[-1].content if messages and hasattr(messages[-1], 'content') else ""
+                # The messages list is already in the correct format for generate_response
                 
                 # Simulate tool calling if the prompt suggests it
                 # This is a very basic simulation and will need to be replaced
                 # with actual tool parsing and execution.
-                if "write_file" in prompt and "filename=" in prompt:
+                if "write_file" in messages[-1].content and "filename=" in messages[-1].content:
+                    self.manager.logger.debug(f"Simulating write_file tool call with content: {messages[-1].content}")
                     mock_response = MagicMock()
                     mock_response.tool_calls = [{"name": "write_file", "args": {"filename": "simulated.txt", "content": "simulated content"}, "id": "call_write_file_0"}]
                     mock_response.content = ""
                     return mock_response
-                elif "submit_deliverable" in prompt:
+                elif "submit_deliverable" in messages[-1].content:
+                    self.manager.logger.debug(f"Simulating submit_deliverable tool call with content: {messages[-1].content}")
                     mock_response = MagicMock()
                     mock_response.tool_calls = [{"name": "submit_deliverable", "args": {"code": "simulated final code"}, "id": "call_submit_deliverable_0"}]
                     mock_response.content = ""
                     return mock_response
                 else:
-                    response_content = await self.manager.generate_response(self.config, prompt, context=messages[:-1])
+                    response_content = await self.manager.generate_response(self.config, messages)
                     mock_response = MagicMock()
                     mock_response.tool_calls = [] # No tool calls for regular response
                     mock_response.content = response_content

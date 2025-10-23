@@ -125,6 +125,10 @@ This document tracks the step-by-step implementation of the new 'Multi-Layered V
 - [X] Correct `get_llm` call: Ensure the `get_llm` method is called correctly within the `run_sandbox` method.
 
 **Sprint 16: Addressing Persistent LLM Output Issues**
+- [X] Fixed NameError in cli.py by initializing logger earlier.
+- [X] Fixed KeyError in utils/prompts.py by correctly formatting user templates.
+- [X] Improved Quality Gate LLM JSON parsing robustness and model selection.
+- [X] Added enable_system_prompt_files to SystemConfig and CLI.
 - [ ] Enhance Test Code Generation Robustness:
     - Implement more sophisticated parsing/cleaning of generated test code in `run_tests_in_sandbox` to handle common LLM output quirks (e.g., extra conversational text, incomplete code blocks).
     - Consider adding a "code repair" step where a small LLM attempts to fix syntax errors in generated code.
@@ -144,3 +148,71 @@ The Cooperative LLM System has successfully implemented the Multi-Layered Valida
 - [X] Create `USAGE.md`: Develop a detailed `USAGE.md` guide that walks users through setting up the environment, configuring agents, running test cases, interpreting results, and leveraging advanced features like human approval and reflection.
 - [X] Review and Refine Code Comments: Ensure all new code (especially in `workflow/sandbox.py`, `workflow/graph_workflow.py`, `workflow/quality_gate.py`, and `main.py`) has clear and concise comments.
 - [X] Final Code Review: Conduct a final, comprehensive code review to identify any remaining bugs, inconsistencies, or areas for minor optimization.
+- [X] Refined logging messages (FATAL, ERROR, WARNING, INFO, DEBUG levels).
+- [X] Refined CLI arguments for user-friendliness (short and long forms).
+
+## Phase 8: Debugging and Development Experience Improvements (Planned)
+
+### 13. Mockup-driven Debugging for Graph Nodes
+
+**Goal:** Significantly speed up debugging of individual graph nodes by allowing developers to isolate and test them with pre-recorded or "mocked" data.
+
+**Suggestion:** Implement a system where each node's inputs and outputs can be stored in a dedicated "mockup folder." This allows for targeted debugging of a single node without running the entire workflow.
+
+**Implementation Details:**
+
+1.  **Mockup Folder Structure:**
+    *   Create a configurable "mockup folder" (e.g., `mockups/`) within the project structure.
+    *   Within this folder, create subdirectories for each node (e.g., `mockups/requirements_analysis/`, `mockups/system_design/`).
+    *   Each node's subdirectory will contain JSON files representing the `GraphState` *before* and *after* the node's execution for specific test cases.
+
+2.  **Mockup Generation Run:**
+    *   Introduce a special "mockup generation" mode (e.g., a new CLI flag `--generate-mockups`).
+    *   When enabled, the system will run a full workflow, but instead of just processing data, it will save the `GraphState` at the entry and exit of *every* node into the respective mockup folder. This creates a comprehensive dataset of node inputs and outputs.
+
+3.  **Mockup-driven Debugging Mode:**
+    *   Introduce a "mockup-driven debugging" mode (e.g., a new CLI flag `--debug-node <node_name>`).
+    *   When enabled, and a specific node is targeted:
+        *   **Input Mocking:** For all nodes *before* the targeted node in the workflow, the system will *load* their output `GraphState` from the mockup folder instead of actually executing them.
+        *   **Targeted Execution:** The specified `<node_name>` will execute normally, taking its input from the mockup data (or the output of the preceding mocked node).
+        *   **Output Mocking:** For all nodes *after* the targeted node, the system will *load* their input `GraphState` from the mockup folder and simply output their pre-recorded output, effectively skipping their execution.
+        *   **Output Recording (Optional):** The output of the targeted node can optionally be saved back to its mockup file, allowing for iterative refinement of a single node's logic.
+
+**Benefits:**
+*   **Faster Iteration:** Developers can test changes to a single node in seconds or minutes, rather than waiting for a full workflow run (which can take hours).
+*   **Isolated Testing:** Ensures that changes to one node don't inadvertently break others, as the inputs from other nodes are controlled.
+*   **Reproducible Bugs:** Easily reproduce specific node behaviors by loading the exact input state from a mockup.
+*   **Reduced LLM Costs:** Avoids unnecessary LLM calls for nodes that are not being actively debugged.
+*   **Enhanced Development Experience:** Streamlines the debugging process, making it more efficient and less frustrating.
+
+### 14. Implement Quality Gate LLM suitability testing with mockup data.
+
+**Goal:** Systematically test all available LLMs on Ollama to determine their suitability as a Quality Gate, ensuring consistent and correctly formatted JSON output.
+
+**Suggestion:** Develop a dedicated testing script that leverages generated mockup data to evaluate each LLM's performance against predefined criteria for Quality Gate functionality.
+
+**Implementation Details:**
+
+1.  **Mockup Data Generation:**
+    *   Utilize the `enable_mockup_generation` flag (to be added to `SystemConfig`) to run the main workflow and capture `current_state` and `previous_state` at the entry of the `quality_gate_node`.
+    *   Store these states as JSON files in a designated `mockups/quality_gate/` directory.
+
+2.  **LLM Suitability Testing Script (`test_quality_gate_llms.py`):**
+    *   **Retrieve All Ollama Models:** Use the `ollama.AsyncClient().list()` method to get a list of all models available on the configured Ollama host.
+    *   **Iterate and Test:** For each available LLM model:
+        *   Load a set of pre-generated mockup `current_state` and `previous_state` pairs.
+        *   Instantiate `QualityGate` with the current LLM model as `gate_config`.
+        *   Call `QualityGate.evaluate_state` with the mockup data.
+        *   Capture the `evaluation_result` (including `quality_score`, `change_magnitude`, `decision`, `reasoning`, and `assessment_text`).
+    *   **Assess Suitability:** Evaluate each LLM's output based on:
+        *   **JSON Adherence:** Does the `assessment_text` consistently contain valid JSON in the expected `quality_score`, `change_magnitude`, `confidence`, `decision`, `reasoning` format?
+        *   **Parsing Success:** Was `_parse_assessment` able to successfully parse the JSON without falling back to regex or returning default values?
+        *   **Plausible Scores/Decisions:** Do the extracted scores and decisions seem reasonable given the input states (this might require some basic heuristics or manual review of a sample)?
+    *   **Report Results:** Log detailed results for each LLM, indicating its JSON adherence, parsing success, and overall suitability for the Quality Gate role.
+
+**Benefits:**
+*   **Reliable Quality Gate:** Ensures that the Quality Gate consistently receives and correctly parses assessments, preventing workflow stagnation due to parsing errors.
+*   **Informed Model Selection:** Provides data-driven insights into which LLM models are best suited for the critical Quality Gate role.
+*   **Reduced Debugging Time:** Quickly identifies LLMs that struggle with strict output formats, saving development time.
+*   **Improved Workflow Stability:** Contributes to a more stable and predictable workflow by using models that reliably follow instructions.
+

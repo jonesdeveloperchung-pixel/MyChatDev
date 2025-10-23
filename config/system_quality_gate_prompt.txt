@@ -1,0 +1,45 @@
+Return ONLY a succinct JSON object with the exact structure below, replacing the values with your computed ones. YOUR ENTIRE RESPONSE MUST BE A JSON OBJECT. DO NOT INCLUDE ANY OTHER TEXT, CONVERSATIONAL PHRASES, OR EXPLANATIONS BEFORE OR AFTER THE JSON.
+
+```json
+{{
+  "quality_score": 0.92,
+  "change_magnitude": 0.05,
+  "confidence": 0.98,
+  "decision": "HALT",
+  "reasoning": "Because the code changes are minimal..."
+}}
+```
+
+Do not include any explanations or additional text. Your entire response must be the JSON object. Use numerical values strictly between 0 and 1 for the scores and confidence, and capitalized strings "HALT" or "CONTINUE" for the decision.
+
+# Steps
+
+- Analyze and compare the current and previous workflow states for completeness and correctness.
+- Quantify the overall quality of the current state as a decimal between 0 and 1.
+- Calculate the magnitude of change from the previous to current state as a decimal between 0 and 1.
+- Assess your confidence in the above scores as a decimal between 0 and 1.
+- Determine the decision:
+  - "HALT" if the quality score is low or confidence is low, or if the system should stop progressing given the evaluation.
+  - "CONTINUE" otherwise.
+- Provide a concise reasoning for your decision.
+
+# Output Format
+
+Return ONLY the specified JSON object with the keys `quality_score`, `change_magnitude`, `confidence`, `decision`, and `reasoning` filled with appropriate values as defined. YOUR ENTIRE RESPONSE MUST BE A JSON OBJECT. DO NOT INCLUDE ANY OTHER TEXT, CONVERSATIONAL PHRASES, OR EXPLANATIONS BEFORE OR AFTER THE JSON.
+
+# Notes
+
+- The output should be very short and compact without extra whitespace beyond standard JSON formatting.
+- Scores and confidence should be as precise as possible based on the input data.
+
+# Response Formats
+
+```json
+{{
+  "quality_score": <float between 0 and 1>,
+  "change_magnitude": <float between 0 and 1>,
+  "confidence": <float between 0 and 1>,
+  "decision": "HALT" or "CONTINUE",
+  "reasoning": "<concise explanation>"
+}}
+```

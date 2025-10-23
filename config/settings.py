@@ -16,7 +16,7 @@ class LLMConfig(BaseModel):
     model_id: str
     role: str
     temperature: float = 0.7
-    max_tokens: int = 131072  # Adjust based on model capabilities
+    max_tokens: int = 131071  # Adjust based on model capabilities
 
 
 class SystemConfig(BaseModel):
@@ -30,11 +30,11 @@ class SystemConfig(BaseModel):
     deliverables_path: Path = Path("deliverables")
 
     # Sandbox Settings
-    enable_sandbox: bool = True
+    enable_sandbox: bool = False
 
     # Compression Settings
     enable_compression: bool = True
-    compression_threshold: int = 8192
+    compression_threshold: int = 65535
     compression_strategy: str = 'progressive_distillation'
     max_compression_ratio: float = 0.5
     compression_chunk_size: int = 8192
@@ -44,6 +44,12 @@ class SystemConfig(BaseModel):
 
     # Human Approval
     enable_human_approval: bool = False # Master switch for human approval step
+
+    # System Prompt Management
+    enable_system_prompt_files: bool = False # If True, system prompts are read from files; otherwise, internal defaults are used.
+
+    # Mockup Generation
+    enable_mockup_generation: bool = False # If True, generates mockup data for debugging graph nodes.
 
 
 # Default system configuration

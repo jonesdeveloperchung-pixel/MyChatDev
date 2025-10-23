@@ -100,6 +100,34 @@ asyncio.run(main())
 python main.py
 ```
 
+### Running via CLI
+
+The `cli.py` script provides a command-line interface to run the Cooperative LLM System with various configurable parameters.
+
+```bash
+python cli.py -P <profile_name> -U <prompt_file_path> --debug --url <ollama_host_url> --max_iterations <num> --enable_sandbox <true/false> ...
+```
+
+**Key CLI Arguments:**
+
+*   `-P, --profile <profile_name>`: Selects an LLM profile (e.g., `high_reasoning`, `medium_reasoning`, `low_reasoning`).
+*   `-U, --user_prompt <prompt_file_path>`: Path to a file containing the user prompt.
+*   `--debug`: Enables debug-level logging.
+*   `-O, --ollama_url <ollama_host_url>`: Specifies the URL of the Ollama host (e.g., `http://localhost:11434`).
+*   `--max_iterations <num>`: Maximum number of iterations for the workflow.
+*   `--enable_sandbox <true/false>`: Enable or disable the sandboxed development environment.
+*   `--quality_threshold <float>`: Quality score threshold for the Quality Gate.
+*   `--change_threshold <float>`: Change magnitude threshold for the Quality Gate (stagnation).
+*   `--stagnation_iterations <num>`: Number of iterations to check for stagnation.
+*   `-Y, --enable_system_prompt_files <true/false>`: Enable or disable reading system prompts from files. If `false`, internal default system prompts are used.
+*   `--enable_mockup_generation <true/false>`: Enable or disable generating mockup data for debugging graph nodes.
+
+**Example:**
+
+```bash
+python cli.py -P low_reasoning -U prompts/python_factorial.txt -D -O http://localhost:11434 --max_iterations 3 -S true -T 3
+```
+
 ## 🔧 Configuration
 
 ### LLM Model Assignment
@@ -142,11 +170,11 @@ Here's an example of the `DEFAULT_CONFIG` structure, which corresponds to the co
 
 ```python
 DEFAULT_CONFIG = SystemConfig(
-    ollama_host="http://localhost:11434",
+    ollama_host="http://localhost:11434",  # Can be overridden by -O, --ollama_url CLI argument
     max_iterations=5,
     quality_threshold=0.8,
     change_threshold=0.1,
-    log_level="INFO",
+    log_level="INFO", # Can be overridden by -D, --debug CLI argument
 
     # Sandbox Settings
     enable_sandbox=True,                # Master switch for the sandboxed development environment
@@ -159,10 +187,16 @@ DEFAULT_CONFIG = SystemConfig(
     compression_chunk_size=8192,        # Size of chunks for progressive distillation
 
     # Stagnation Detection
-    stagnation_iterations=3,            # Number of iterations to check for stagnation before triggering reflection
+    stagnation_iterations=3,            # Can be overridden by -T, --stagnation_iterations CLI argument
 
     # Human Approval
-    enable_human_approval=False,        # Master switch for the optional human approval step
+    enable_human_approval: bool = False,        # Master switch for the optional human approval step
+
+    # System Prompt Management
+    enable_system_prompt_files: bool = False,   # If True, system prompts are read from files; otherwise, internal defaults are used.
+
+    # Mockup Generation
+    enable_mockup_generation: bool = False,     # If True, generates mockup data for debugging graph nodes.
 )
 ```
 
@@ -185,6 +219,7 @@ The system includes an intelligent quality gate that uses a rubric-based assessm
 
 ### Comprehensive Logging
 
+- **Refined Levels**: Logging messages are categorized into FATAL, ERROR, WARNING, INFO, and DEBUG levels for precise monitoring.
 - **Node Execution**: Detailed logs for each workflow step
 - **Timestamps**: All operations timestamped
 - **Input/Output Tracking**: Size and content logging
@@ -196,11 +231,13 @@ Logs are saved to `logs/coop_llm_YYYYMMDD_HHMMSS.log`
 
 ### Debug Information
 
-```python
-# Enable debug logging
-from utils.logging_config import setup_logging
-logger = setup_logging("DEBUG")
+To enable debug-level logging, use the `-D` or `--debug` CLI flag when running `cli.py`:
+
+```bash
+python cli.py -D ...
 ```
+
+Alternatively, you can set the `log_level` in `config/settings.py` to `DEBUG`.
 
 ## 📦 Deliverables
 

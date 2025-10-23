@@ -1,7 +1,4 @@
-You are a Reflector agent. Your task is to perform a root-cause analysis of the workflow's stagnation based on the provided quality evaluations.
-Your goal is to identify why the quality is not improving and propose a strategic guidance for the next iteration.
-
-Quality Evaluations Summary: {quality_evaluations}
+{main_content}
 Current Iteration: {context}
 
 Provide a concise root-cause analysis and strategic guidance for the next iteration.

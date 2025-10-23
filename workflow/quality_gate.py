@@ -127,27 +127,37 @@ class QualityGate:
 
         # 1️⃣ Build the prompt that asks the LLM to assess the
         #     current / previous state.
-        prompt = get_prompt(
+        prompt_parts = get_prompt(
             "quality_gate",
             current_state=self._format_state(current_state),
             previous_state=self._format_state(previous_state)
             if previous_state
             else "None",
         )
+        messages = []
+        if prompt_parts.get("system"):
+            messages.append({"role": "system", "content": prompt_parts["system"]})
+        messages.append({"role": "user", "content": prompt_parts["user"]})
+
+        self.logger.debug(f"Full prompt sent to Quality Gate LLM:\nSystem: {prompt_parts.get("system")}\nUser: {prompt_parts["user"]}\n---")
 
         try:
             # 2️⃣ Ask the LLM for a quality assessment.
             assessment = await self.llm_manager.generate_response(
-                self.gate_config, prompt
+                self.gate_config, messages
             )
 
-            # 3️⃣ Parse the raw text into individual metrics.
-            (
-                quality_score,
-                change_magnitude,
-                decision,
-                reasoning,
-            ) = self._parse_assessment(assessment)
+            try:
+                # 3️⃣ Parse the raw text into individual metrics.
+                (
+                    quality_score,
+                    change_magnitude,
+                    decision,
+                    reasoning,
+                ) = self._parse_assessment(assessment)
+            except Exception as parse_e:
+                self.logger.error(f"Error during _parse_assessment: {parse_e}")
+                raise # Re-raise to be caught by the outer try-except
 
             # 4️⃣ Log the extracted metrics – useful for debugging.
             self.logger.info(f"Quality Score: {quality_score}")
@@ -155,14 +165,18 @@ class QualityGate:
             self.logger.info(f"Decision: {decision}")
             self.logger.info(f"Reasoning: {reasoning}")
 
-            # 5️⃣ Determine whether to halt.
-            should_halt = self._should_halt(
-                decision,
-                quality_score,
-                change_magnitude,
-                self.quality_threshold,
-                self.change_threshold,
-            )
+            try:
+                # 5️⃣ Determine whether to halt.
+                should_halt = self._should_halt(
+                    decision,
+                    quality_score,
+                    change_magnitude,
+                    self.quality_threshold,
+                    self.change_threshold,
+                )
+            except Exception as halt_e:
+                self.logger.error(f"Error during _should_halt: {halt_e}")
+                raise # Re-raise to be caught by the outer try-except
 
             evaluation_result = {
                 "quality_score": quality_score,
@@ -187,14 +201,12 @@ class QualityGate:
             else:
                 self.logger.info("🟢 QUALITY GATE: CONTINUING EXECUTION")
 
+            self.logger.debug(f"evaluate_state returning: should_halt={should_halt}, evaluation_result={evaluation_result}")
             return should_halt, evaluation_result
 
         except Exception as e:
-            # If something goes wrong we log the error and **default to
-            # continue** – we prefer the workflow to finish over
-            # accidentally halting it.
             self.logger.error(f"Error in quality gate evaluation: {e}")
-            return False, {
+            error_result = {
                 "quality_score": 0.0,
                 "change_magnitude": 1.0,
                 "decision": "CONTINUE",
@@ -202,6 +214,8 @@ class QualityGate:
                 "should_halt": False,
                 "assessment_text": "",
             }
+            self.logger.debug(f"evaluate_state returning (on error): should_halt={False}, evaluation_result={error_result}")
+            return False, error_result
 
     def _format_state(self, state: Dict[str, Any] | None) -> str:
         """
@@ -249,7 +263,49 @@ class QualityGate:
         decision = "CONTINUE"
         reasoning = "Unable to parse assessment"
 
+        self.logger.debug(f"Raw assessment from LLM: {assessment}")
+        extracted_json_string = ""
+
+        # 1. Try to extract JSON from a markdown code block (```json ... ```)
+        json_match = re.search(r"```json\n(.*?)```", assessment, re.DOTALL)
+        if json_match:
+            extracted_json_string = json_match.group(1).strip()
+            self.logger.debug(f"Extracted JSON from markdown block: {extracted_json_string}")
+        else:
+            # 2. If no markdown block, try to find the first and last curly brace
+            #    to isolate a potential JSON object that's not wrapped.
+            first_brace = assessment.find('{')
+            last_brace = assessment.rfind('}')
+            if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+                extracted_json_string = assessment[first_brace : last_brace + 1].strip()
+                self.logger.debug(f"Extracted JSON by braces: {extracted_json_string}")
+            else:
+                self.logger.debug("No JSON markdown block or valid braces found. Proceeding with raw string for regex fallback.")
+                extracted_json_string = assessment # Use the whole assessment for regex if no JSON found
+
         try:
+            # Attempt to parse as JSON first
+            json_assessment = json.loads(extracted_json_string)
+            quality_score = float(json_assessment.get("quality_score", 0.5))
+            change_magnitude = float(json_assessment.get("change_magnitude", 0.5))
+            decision = json_assessment.get("decision", "CONTINUE").upper()
+            reasoning = json_assessment.get("reasoning", "No reasoning provided.")
+
+            # Normalise if the model accidentally returns >1 (e.g. “9.2”).
+            if quality_score > 1:
+                quality_score = quality_score / 10 if quality_score <= 10 else 1.0
+            if change_magnitude > 1:
+                change_magnitude = change_magnitude / 10 if change_magnitude <= 10 else 1.0
+
+        except json.JSONDecodeError:
+            self.logger.warning("LLM assessment is not valid JSON. Attempting regex parsing.")
+            # Fallback to regex parsing if JSON parsing fails (for robustness)
+            # Default values if parsing fails.
+            quality_score = 0.5
+            change_magnitude = 0.5
+            decision = "CONTINUE"
+            reasoning = "Unable to parse assessment"
+
             # ---------- Quality score ----------
             quality_match = re.search(
                 r"quality.*?score.*?[:\-]?\s*([0-9]*\.?[0-9]+)",
@@ -286,9 +342,10 @@ class QualityGate:
             # Find the first occurrence of a keyword followed by a colon/dash
             # and capture the rest of the line (or multiline).
             reasoning_patterns = [
-                r"Reasoning[:\\-]?\\s*(.+)", # Capture everything after "Reasoning:"
-                r"because[:\\-]?\\s*(.+?)(?:\\n|$)",
-                r"decision[:\\-]?\\s*(.+?)(?:\\n|$)",
+                r"Reasoning[:\-]?\s*(.+)",  # Capture everything after "Reasoning:"
+                r'reasoning"\s*:\s*"([^"]+)',  # Capture reasoning from JSON-like string if regex is used
+                r"because[:\-]?\s*(.+?)(?:\n|$)",
+                r"decision[:\-]?\s*(.+?)(?:\n|$)",
             ]
             for pattern in reasoning_patterns:
                 reasoning_match = re.search(

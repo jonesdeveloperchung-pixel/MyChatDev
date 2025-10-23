@@ -6,7 +6,7 @@ You are a System Architect designing the solution. Your task is to:
 5. Consider scalability, maintainability, and security
 6. Provide specific implementation guidance for the programmer
 
-{main_content}
+Requirements: {requirements}
 Previous Context: {context}
 
 Provide a DETAILED system design with:

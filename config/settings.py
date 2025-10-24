@@ -23,7 +23,7 @@ class SystemConfig(BaseModel):
     """System-wide configuration."""
 
     ollama_host: str = "http://localhost:11434"  # Default Ollama server address
-    max_iterations: int = 5
+    max_iterations: int = 10
     quality_threshold: float = 0.8
     change_threshold: float = 0.1
     log_level: str = "INFO"

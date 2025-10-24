@@ -133,6 +133,7 @@ class QualityGate:
             previous_state=self._format_state(previous_state)
             if previous_state
             else "None",
+            system_config=self.llm_manager.config,
         )
         messages = []
         if prompt_parts.get("system"):
@@ -267,7 +268,7 @@ class QualityGate:
         extracted_json_string = ""
 
         # 1. Try to extract JSON from a markdown code block (```json ... ```)
-        json_match = re.search(r"```json\n(.*?)```", assessment, re.DOTALL)
+        json_match = re.search(r"```json\s*(.*?)```", assessment, re.DOTALL)
         if json_match:
             extracted_json_string = json_match.group(1).strip()
             self.logger.debug(f"Extracted JSON from markdown block: {extracted_json_string}")
@@ -285,7 +286,11 @@ class QualityGate:
 
         try:
             # Attempt to parse as JSON first
-            json_assessment = json.loads(extracted_json_string)
+            # Replace single quotes with double quotes
+            json_str = extracted_json_string.replace("'", '"')
+            # Remove trailing commas
+            json_str = re.sub(r",\s*([\}\]])", r'\1', json_str)
+            json_assessment = json.loads(json_str)
             quality_score = float(json_assessment.get("quality_score", 0.5))
             change_magnitude = float(json_assessment.get("change_magnitude", 0.5))
             decision = json_assessment.get("decision", "CONTINUE").upper()

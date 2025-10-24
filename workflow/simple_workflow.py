@@ -47,7 +47,8 @@ class SimpleCooperativeLLM:
         llm_config = self.llm_configs["product_manager"]
         prompt = get_prompt(
             "product_manager",
-            user_input=state.user_input,
+            main_content=state.user_input,
+            system_config=self.config,
             context=f"Iteration: {state.iteration_count}",
         )
 
@@ -85,7 +86,8 @@ class SimpleCooperativeLLM:
         llm_config = self.llm_configs["architect"]
         prompt = get_prompt(
             "architect",
-            requirements=state.requirements,
+            main_content=state.requirements,
+            system_config=self.config,
             context=f"Iteration: {state.iteration_count}",
         )
 
@@ -123,7 +125,8 @@ class SimpleCooperativeLLM:
         llm_config = self.llm_configs["programmer"]
         prompt = get_prompt(
             "programmer",
-            design=state.design,
+            main_content=state.design,
+            system_config=self.config,
             context=f"Iteration: {state.iteration_count}",
         )
 
@@ -161,8 +164,9 @@ class SimpleCooperativeLLM:
         llm_config = self.llm_configs["tester"]
         prompt = get_prompt(
             "tester",
-            code=state.code,
+            main_content=state.code,
             requirements=state.requirements,
+            system_config=self.config,
             context=f"Iteration: {state.iteration_count}",
         )
 
@@ -204,7 +208,8 @@ class SimpleCooperativeLLM:
 
         prompt = get_prompt(
             "reviewer",
-            deliverables=deliverables_text,
+            main_content=deliverables_text,
+            system_config=self.config,
             context=f"Iteration: {state.iteration_count}",
         )
 

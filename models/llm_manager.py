@@ -29,7 +29,7 @@ class LLMManager:
 
         try:
             models_response = await self.client.list()
-            available_models = [model.model for model in models_response.models]
+            available_models = [model['model'] for model in models_response['models']]
 
             is_available = model_id in available_models
             self._model_cache[model_id] = is_available
@@ -120,7 +120,7 @@ class LLMManager:
         if len(content) <= max_length:
             return content
 
-        prompt_parts = get_prompt("summarizer", main_content=content, max_length=max_length)
+        prompt_parts = get_prompt("summarizer", main_content=content, system_config=self.config, max_length=max_length)
         messages = [{'role': 'user', 'content': prompt_parts["user"]}] # Extract the user part of the prompt
 
         try:

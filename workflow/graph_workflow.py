@@ -181,7 +181,7 @@ class GraphWorkflow:
         if state.get('strategic_guidance'):
             prompt_context += f"\nStrategic Guidance: {state['strategic_guidance']}"
 
-        prompt_parts = get_prompt("product_manager", main_content=state['user_input'], context=prompt_context)
+        prompt_parts = get_prompt("product_manager", main_content=state['user_input'], system_config=self.config, context=prompt_context)
         self.logger.debug(f"Prompt context for Product Manager: {prompt_context}")
         messages = []
         if prompt_parts.get("system"):
@@ -215,7 +215,7 @@ class GraphWorkflow:
         if state.get('strategic_guidance'):
             prompt_context += f"\nStrategic Guidance: {state['strategic_guidance']}"
 
-        prompt_parts = get_prompt("architect", main_content=state['requirements'], context=prompt_context)
+        prompt_parts = get_prompt("architect", main_content=state['requirements'], system_config=self.config, context=prompt_context)
         self.logger.debug(f"Prompt context for Architect: {prompt_context}")
         messages = []
         if prompt_parts.get("system"):
@@ -273,7 +273,7 @@ class GraphWorkflow:
             prompt_context += f"\nReview Feedback: {state['review_feedback']}"
 
         combined_content = f"Requirements:\n{state['requirements']}\n\nSystem Design:\n{state['design']}"
-        prompt_parts = get_prompt("programmer", main_content=combined_content, context=prompt_context)
+        prompt_parts = get_prompt("programmer", main_content=combined_content, system_config=self.config, context=prompt_context)
         self.logger.debug(f"Prompt context for Programmer: {prompt_context}")
         messages = []
         if prompt_parts.get("system"):
@@ -311,7 +311,7 @@ class GraphWorkflow:
         
         # 1. Generate tests
         combined_content = f"Code Implementation:\n{state['code']}\n\nRequirements:\n{state['requirements']}"
-        prompt_parts = get_prompt("tester", main_content=combined_content, context=f"Iteration: {state['iteration_count']}")
+        prompt_parts = get_prompt("tester", main_content=combined_content, system_config=self.config, context=f"Iteration: {state['iteration_count']}")
         self.logger.debug(f"Prompt context for Tester: Iteration: {state['iteration_count']}")
         messages = []
         if prompt_parts.get("system"):
@@ -348,7 +348,7 @@ class GraphWorkflow:
         start_time = time.time()
         llm_config = self.llm_configs["reviewer"]
         deliverables_text = "\n\n".join([f"{k}: {v}" for k, v in state['deliverables'].items()])
-        prompt_parts = get_prompt("reviewer", main_content=deliverables_text, context=f"Iteration: {state['iteration_count']}")
+        prompt_parts = get_prompt("reviewer", main_content=deliverables_text, system_config=self.config, context=f"Iteration: {state['iteration_count']}")
         self.logger.debug(f"Prompt context for Reviewer: Iteration: {state['iteration_count']}")
         messages = []
         if prompt_parts.get("system"):
@@ -388,8 +388,11 @@ class GraphWorkflow:
         formatted_previous_state = self._format_state(previous_state) if previous_state else "No previous state available."
         prompt_parts = get_prompt(
             "quality_gate",
-            current_state=formatted_current_state,
-            previous_state=formatted_previous_state,
+            current_state=self._format_state(current_state_snapshot),
+            previous_state=self._format_state(previous_state)
+            if previous_state
+            else "None",
+            system_config=self.config,
         )
         try:
             should_halt, evaluation_from_evaluate_state = await self.quality_gate.evaluate_state(current_state_snapshot, previous_state)
@@ -445,7 +448,7 @@ class GraphWorkflow:
         
         # Prepare context for the Reflector LLM
         evaluations_summary = "\n".join([str(eval) for eval in state['quality_evaluations']])
-        prompt_parts = get_prompt("reflector", main_content=evaluations_summary, context=f"Iteration: {state['iteration_count']}")
+        prompt_parts = get_prompt("reflector", main_content=evaluations_summary, system_config=self.config, context=f"Iteration: {state['iteration_count']}")
         self.logger.debug(f"Prompt context for Reflector: Iteration: {state['iteration_count']}")
         messages = []
         if prompt_parts.get("system"):
@@ -507,7 +510,9 @@ class GraphWorkflow:
         }
         
         # Execute the graph and get the final state
-        final_state = await self.graph.ainvoke(initial_state)
+        recursion_limit = self.config.max_iterations * 10
+        self.logger.debug(f"Setting graph recursion limit to: {recursion_limit}")
+        final_state = await self.graph.ainvoke(initial_state, config={"recursion_limit": recursion_limit})
 
         self.logger.debug(f"Final state after graph execution: {final_state}")
 

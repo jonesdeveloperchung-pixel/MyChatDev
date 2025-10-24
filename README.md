@@ -7,13 +7,13 @@ A Python program that enables cooperative interaction between multiple locally h
 The system implements a **Multi-Layered Validation Workflow** where different LLMs take on specialized roles, orchestrated through a **graph-based state machine using LangGraph**. The key to this architecture is a series of fast, iterative loops that validate the work at each stage, including a sandboxed environment for code development and a reflective mechanism for overcoming stagnation.
 
 ### Agent Roles
-- **Product Manager**: Analyzes initial requirements and consults the system's **Experience/Memory**.
-- **System Architect**: Creates the high-level technical design.
-- **Tester**: Generates unit tests and **executes them within a sandboxed environment** to validate the code.
-- **Programmer**: A **tool-using agent** that works within a sandboxed environment to write, compile, and test code until it passes the required checks, incorporating feedback from the Tester and Reviewer.
-- **Code Reviewer**: Performs a holistic review of the validated code for logic, style, and maintainability, providing actionable feedback.
-- **Quality Gate**: A system agent that performs a rubric-based quality assessment and **adaptively decides whether to halt, continue, or trigger reflection**.
-- **Reflector**: A system agent that performs root-cause analysis when the workflow stagnates and proposes **strategic guidance**.
+- **Product Manager**: Analyzes initial requirements (derived from the user's prompt) and consults the system's **Experience/Memory**.
+- **System Architect**: Creates the high-level technical design based on the Product Manager's requirements.
+- **Tester**: Generates unit tests and **executes them within a sandboxed environment** to validate the code, using the Programmer's code and the Product Manager's requirements as input.
+- **Programmer**: A **tool-using agent** that works within a sandboxed environment to write, compile, and test code until it passes the required checks, incorporating feedback from the Tester and Reviewer, and guided by the System Architect's design.
+- **Code Reviewer**: Performs a holistic review of the validated code for logic, style, and maintainability, providing actionable feedback based on all previous deliverables.
+- **Quality Gate**: A system agent that performs a rubric-based quality assessment and **adaptively decides whether to halt, continue, or trigger reflection** based on the current state of all deliverables.
+- **Reflector**: A system agent that performs root-cause analysis when the workflow stagnates and proposes **strategic guidance** based on quality evaluations.
 - **Distiller**: A system agent that intelligently compresses content to preserve context.
 
 ## 📁 Project Structure
@@ -165,6 +165,8 @@ Alternatively, you can override these parameters directly from the command line 
 ```bash
 python cli.py --url http://192.168.16.120:11434 --max_iterations 10 --enable_sandbox false --quality_threshold 0.9
 ```
+
+**System Prompt Management:** The `enable_system_prompt_files` setting (default `False`) controls whether system prompts are loaded from internal defaults or external files. By default, internal system prompts are used for all LLM roles. When `enable_system_prompt_files` is `True`, the system attempts to load prompts from `config/system_<role>_prompt.txt` files. The system logs (at INFO level) whether an internal or external system prompt is being used for each role.
 
 Here's an example of the `DEFAULT_CONFIG` structure, which corresponds to the configurable parameters:
 
@@ -374,11 +376,17 @@ def custom_quality_check(self, state: WorkflowState) -> float:
    - Reduce `compression_threshold` in `config/settings.py` (or via CLI).
    - Use smaller models for non-critical roles.
 
-4. **Graph Recursion Limit Reached**
-   - This can manifest as `GraphRecursionError: Recursion limit of X reached`.
-   - This indicates the workflow is iterating too many times without reaching a stop condition.
-   - You can increase the limit by setting the `recursion_limit` config key (though this is not directly exposed via CLI yet).
-   - More importantly, analyze the logs and deliverables to understand why the workflow is not progressing or halting. This often points to issues with agent prompts or quality gate logic.
+4. **Graph Recursion Limit Managed Dynamically**
+   - This used to manifest as `GraphRecursionError: Recursion limit of X reached`.
+   - **Solution:** The `recursion_limit` is now dynamically managed by the system based on the `--max_iterations` CLI argument. This ensures that the internal graph recursion limit is automatically adjusted to accommodate longer workflows, reducing the likelihood of this error for typical use cases. If this error still occurs, consider if your workflow logic has unintended infinite loops or if `max_iterations` is set to an extremely high value. Analyze logs and deliverables to understand workflow progression.
+
+5. **Quality Gate LLM Not Returning Valid JSON**
+   - This can manifest as `LLM assessment is not valid JSON` warnings and the workflow getting stuck in a loop.
+   - **Cause:** The LLM assigned to the Quality Gate role is not consistently adhering to the strict JSON output format specified in its prompts.
+   - **Solution:**
+     - **Model Selection:** Ensure you are using a sufficiently capable LLM for the Quality Gate role (e.g., `gemma3:4b` or larger models are generally better at strict instruction following than `tinyllama`).
+     - **Prompt Review:** Carefully review `config/system_quality_gate_prompt.txt` and `config/quality_gate_prompt.txt` to ensure the instructions for JSON output are clear, unambiguous, and strongly emphasized.
+     - **Parsing Robustness:** The system includes robust parsing logic, with enhancements to sanitize JSON (e.g., replacing single quotes with double quotes, removing trailing commas) and a more flexible regex for extracting JSON from markdown blocks. However, consistent JSON output from the LLM is paramount for accurate assessment.
 
 ### Performance Optimization
 

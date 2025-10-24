@@ -20,10 +20,10 @@ async def debug_ollama(ollama_host: str):
         if models_response and models_response.get("models"):
             print(f"Found {len(models_response["models"])} models:")
             for model_obj in models_response["models"]:
-                name = model_obj.model  # Access the 'model' attribute directly
-                size_bytes = model_obj.size
+                name = model_obj['model']  # Access the 'model' attribute directly
+                size_bytes = model_obj['size']
                 size_mb = size_bytes / (1024 * 1024)
-                modified_at = model_obj.modified_at
+                modified_at = model_obj['modified_at']
                 print(f"  - Name: {name}, Size: {size_mb:.2f} MB, Last Modified: {modified_at}")
         else:
             print("No models found or unexpected response format.")

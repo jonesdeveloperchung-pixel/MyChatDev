@@ -38,3 +38,13 @@ build/
 logs/
 deliverables/
 mockups/
+
+# Databases
+*.sqlite3
+*.db
+
+# Logs
+*.log
+
+# Jupyter notebooks
+.ipynb_checkpoints/

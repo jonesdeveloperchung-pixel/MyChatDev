@@ -1,0 +1,58 @@
+# Sample Custom LLM Profile
+# This file defines the LLM configurations for different agent roles.
+
+product_manager:
+  name: Custom Product Manager
+  model_id: llama3:8b
+  role: product_manager
+  temperature: 0.5
+  max_tokens: 4096
+
+architect:
+  name: Custom System Architect
+  model_id: codellama:13b
+  role: architect
+  temperature: 0.3
+  max_tokens: 8192
+
+programmer:
+  name: Custom Programmer
+  model_id: deepseek-coder:6.7b
+  role: programmer
+  temperature: 0.1
+  max_tokens: 16384
+
+tester:
+  name: Custom Tester
+  model_id: llama3:8b
+  role: tester
+  temperature: 0.2
+  max_tokens: 4096
+
+reviewer:
+  name: Custom Code Reviewer
+  model_id: codellama:7b
+  role: reviewer
+  temperature: 0.4
+  max_tokens: 8192
+
+reflector:
+  name: Custom Reflector
+  model_id: llama3:8b
+  role: reflector
+  temperature: 0.6
+  max_tokens: 4096
+
+quality_gate:
+  name: Custom Quality Gate
+  model_id: llama3:8b
+  role: quality_gate
+  temperature: 0.1
+  max_tokens: 2048
+
+distiller:
+  name: Custom Distiller
+  model_id: tinyllama:1.1b
+  role: distiller
+  temperature: 0.3
+  max_tokens: 1024

@@ -205,6 +205,19 @@ class QualityGate:
             self.logger.debug(f"evaluate_state returning: should_halt={should_halt}, evaluation_result={evaluation_result}")
             return should_halt, evaluation_result
 
+        except ValueError as e:
+            error_message = f"ERROR: LLM Model '{self.gate_config.model_id}' required for Quality Gate is not available. Please pull it using 'ollama pull {self.gate_config.model_id}'."
+            self.logger.error(error_message)
+            error_result = {
+                "quality_score": 0.0,
+                "change_magnitude": 1.0,
+                "decision": "CONTINUE",
+                "reasoning": error_message,
+                "should_halt": False,
+                "assessment_text": "",
+            }
+            self.logger.debug(f"evaluate_state returning (on error): should_halt={False}, evaluation_result={error_result}")
+            return False, error_result
         except Exception as e:
             self.logger.error(f"Error in quality gate evaluation: {e}")
             error_result = {

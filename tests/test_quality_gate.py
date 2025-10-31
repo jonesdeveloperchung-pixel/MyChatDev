@@ -6,7 +6,8 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from config.settings import LLMConfig, SystemConfig, AVAILABLE_LLMS
+from config.settings import LLMConfig, SystemConfig
+from config.llm_profiles import AVAILABLE_LLMS_BY_PROFILE
 from models.llm_manager import LLMManager
 from workflow.quality_gate import QualityGate
 from utils.prompts import get_prompt
@@ -29,7 +30,8 @@ class TestQualityGate:
     @pytest.fixture
     def llm_configs(self):
         """Sample LLM configurations for testing."""
-        return AVAILABLE_LLMS
+        # Provide a mock LLMConfig for the quality_gate role directly
+        return {"quality_gate": LLMConfig(name="Mock Quality Gate", model_id="mock:model", role="quality_gate", temperature=0.1)}
 
     @pytest.fixture
     def llm_manager(self, system_config):

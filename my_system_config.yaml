@@ -1,0 +1,16 @@
+# Sample Custom System Configuration
+# This file defines system-wide parameters for the Cooperative LLM System.
+
+ollama_host: http://192.168.1.100:11434  # Example: Your Ollama server address
+max_iterations: 10                     # Maximum number of workflow iterations
+quality_threshold: 0.85                # Minimum quality score to halt the workflow
+change_threshold: 0.15                 # Minimum change magnitude to detect stagnation
+log_level: DEBUG                       # Logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+enable_sandbox: true                   # Enable or disable the sandboxed development environment
+enable_human_approval: false           # Enable or disable human approval step
+enable_compression: true               # Enable or disable content compression
+compression_threshold: 2000            # Content length threshold for compression
+compression_strategy: summarization    # Strategy for compression (e.g., summarization, truncation)
+max_compression_ratio: 0.5             # Maximum compression ratio (e.g., 0.5 means content reduced by 50%)
+compression_chunk_size: 1000           # Chunk size for iterative compression
+stagnation_iterations: 3               # Number of iterations without significant quality improvement to trigger reflection

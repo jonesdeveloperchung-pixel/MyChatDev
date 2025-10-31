@@ -46,19 +46,13 @@ LLM_CONFIGS_GEMMA3_PHI4_GPT: Dict[str, LLMConfig] = {
         role="reviewer",
         temperature=0.3,
     ),
-    "distiller": LLMConfig( # Added
-        name="Distiller",
-        model_id="gemma3:12b",
-        role="distiller",
-        temperature=0.2,
-    ),
-    "reflector": LLMConfig( # Added
+    "reflector": LLMConfig(  # Added
         name="Reflector",
         model_id="gemma3:4b",
         role="reflector",
         temperature=0.2,
     ),
-    "quality_gate": LLMConfig( # Added
+    "quality_gate": LLMConfig(  # Added
         name="Quality Gate",
         model_id="gemma3:4b",
         role="quality_gate",
@@ -98,13 +92,13 @@ LLM_CONFIGS_GPT_OSS: Dict[str, LLMConfig] = {
         role="reviewer",
         temperature=0.3,
     ),
-    "distiller": LLMConfig( # Added
+    "distiller": LLMConfig(  # Added
         name="Distiller",
         model_id="gpt-oss:20b",
         role="distiller",
         temperature=0.2,
     ),
-    "reflector": LLMConfig( # Added
+    "reflector": LLMConfig(  # Added
         name="Reflector",
         model_id="gpt-oss:20b",
         role="reflector",
@@ -150,73 +144,78 @@ LLM_CONFIGS_LLAMMA32: Dict[str, LLMConfig] = {
         role="reviewer",
         temperature=0.3,
     ),
-    "distiller": LLMConfig( # Added
+    "distiller": LLMConfig(  # Added
         name="Distiller",
         model_id="llama3.2:3b",
         role="distiller",
         temperature=0.2,
     ),
-    "reflector": LLMConfig( # Added
+    "reflector": LLMConfig(  # Added
         name="Reflector",
         model_id="llama3.2:3b",
         role="reflector",
         temperature=0.2,
     ),
-    "quality_gate": LLMConfig( # Added
+    "quality_gate": LLMConfig(  # Added
         name="Quality Gate",
         model_id="llama3.2:3b",
         role="quality_gate",
         temperature=0.1,
     ),
+
 }
 
 # -------------------  Profile 4 – Optimized (Copilot) --------------------------------
 LLM_CONFIGS_HIGH_REASONING: Dict[str, LLMConfig] = {
     "product_manager": LLMConfig(
         name="Product Manager",
-        model_id="gemma3:12b",  # balance of reasoning + efficiency
+                model_id="gemma3:12b",  # balance of reasoning + efficiency
         role="product_manager",
         temperature=0.4,  # slightly higher for creativity
     ),
     "architect": LLMConfig(
         name="System Architect",
-        model_id="phi4:14b",  # strong logical reasoning & planning
+                model_id="phi4:14b",  # strong logical reasoning & planning
         role="architect",
         temperature=0.2,
     ),
     "programmer": LLMConfig(
         name="Programmer",
-        model_id="qwen2.5-coder:latest",  # A strong coding model from your list
+                model_id="qwen2.5-coder:latest",  # A strong coding model from your list
         role="programmer",
         temperature=0.1,
     ),
     "tester": LLMConfig(
         name="Tester",
-        model_id="deepseek-coder:6.7b",  # A coding model to generate relevant tests
+                model_id=(
+            "deepseek-coder:6.7b"
+        ),  # A coding model to generate relevant tests
         role="tester",
         temperature=0.25,
     ),
     "reviewer": LLMConfig(
         name="Code Reviewer",
-        model_id="gemma3:4b",  # smaller but precise, good for review
+                model_id="gemma3:4b",  # smaller but precise, good for review
         role="reviewer",
         temperature=0.2,
     ),
     "distiller": LLMConfig(
         name="Distiller",
-        model_id="gemma3:1b",  # Your smallest model for summarization
+                model_id="gemma3:1b",  # Your smallest model for summarization
         role="distiller",
         temperature=0.2,
     ),
     "reflector": LLMConfig(
         name="Reflector",
-        model_id="phi4:14b",  # A powerful model for root cause analysis
+                model_id="phi4:14b",  # A powerful model for root cause analysis
         role="reflector",
         temperature=0.2,
     ),
     "quality_gate": LLMConfig(
         name="Quality Gate",
-        model_id="gemma3:4b",  # A reliable model for scoring and classification
+                model_id=(
+            "gemma3:4b"
+        ),  # A reliable model for scoring and classification
         role="quality_gate",
         temperature=0.1,
     ),
@@ -226,25 +225,25 @@ LLM_CONFIGS_HIGH_REASONING: Dict[str, LLMConfig] = {
 LLM_CONFIGS_LIGHTWEIGHT: Dict[str, LLMConfig] = {
     "product_manager": LLMConfig(
         name="Product Manager",
-        model_id="gemma3:4b", # Replaced llama3.2:3b (1.9GB) with gemma3:4b (3.1GB)
+        model_id="gemma3:4b",  # Replaced llama3.2:3b (1.9GB) with gemma3:4b (3.1GB)
         role="product_manager",
         temperature=0.4,
     ),
     "architect": LLMConfig(
         name="System Architect",
-        model_id="gemma3:4b", # Replaced llama3.2:3b (1.9GB) with gemma3:4b (3.1GB)
+        model_id="gemma3:4b",  # Replaced llama3.2:3b (1.9GB) with gemma3:4b (3.1GB)
         role="architect",
         temperature=0.2,
     ),
     "programmer": LLMConfig(
         name="Programmer",
-        model_id="deepseek-coder:6.7b", # Already >3GB
+        model_id="deepseek-coder:6.7b",  # Already >3GB
         role="programmer",
         temperature=0.1,
     ),
     "tester": LLMConfig(
         name="Tester",
-        model_id="neural-chat:latest", # Replaced tinyllama:latest (608MB) with neural-chat:latest (3.9GB)
+        model_id="neural-chat:latest",  # Replaced tinyllama:latest (608MB) with neural-chat:latest (3.9GB)
         role="tester",
         temperature=0.2,
     ),
@@ -260,9 +259,9 @@ LLM_CONFIGS_LIGHTWEIGHT: Dict[str, LLMConfig] = {
         role="distiller",
         temperature=0.2,
     ),
-    "reflector": LLMConfig( # Added
+    "reflector": LLMConfig(  # Added
         name="Reflector",
-        model_id="neural-chat:latest", # Replaced tinyllama:latest (608MB) with neural-chat:latest (3.9GB)
+        model_id="neural-chat:latest",  # Replaced tinyllama:latest (608MB) with neural-chat:latest (3.9GB)
         role="reflector",
         temperature=0.2,
     ),
@@ -308,13 +307,13 @@ LLM_CONFIGS_MEDIUM_REASONING: Dict[str, LLMConfig] = {
     ),
     "distiller": LLMConfig(
         name="Distiller",
-        model_id="tinyllama:latest", # Smallest for summarization
+        model_id="tinyllama:latest",  # Smallest for summarization
         role="distiller",
         temperature=0.2,
     ),
     "reflector": LLMConfig(
         name="Reflector",
-        model_id="llama3.2:3b", # Good for analysis
+        model_id="llama3.2:3b",  # Good for analysis
         role="reflector",
         temperature=0.2,
     ),

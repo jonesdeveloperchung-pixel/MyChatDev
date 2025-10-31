@@ -201,6 +201,10 @@ class GraphWorkflow:
                 'deliverables': {**state.get('deliverables', {}), 'requirements': response},
             }
             log_node_execution(self.logger, "Requirements Analysis", {"user_input": state['user_input']}, {"requirements": response}, time.time() - start_time)
+        except ValueError as e:
+            error_message = f"ERROR: LLM Model '{llm_config.model_id}' required for Product Manager is not available. Please pull it using 'ollama pull {llm_config.model_id}'."
+            self.logger.error(error_message)
+            updated_state = {'requirements': error_message}
         except Exception as e:
             self.logger.fatal(f"Error in requirements analysis: {e}")
             updated_state = {'requirements': f"Error in requirements analysis: {e}"}
@@ -234,6 +238,10 @@ class GraphWorkflow:
                 'deliverables': {**state.get('deliverables', {}), 'design': response},
             }
             log_node_execution(self.logger, "System Design", {"requirements": state['requirements']}, {"design": response}, time.time() - start_time)
+        except ValueError as e:
+            error_message = f"ERROR: LLM Model '{llm_config.model_id}' required for System Architect is not available. Please pull it using 'ollama pull {llm_config.model_id}'."
+            self.logger.error(error_message)
+            updated_state = {'design': error_message}
         except Exception as e:
             self.logger.fatal(f"Error in system design: {e}")
             updated_state = {'design': f"Error in system design: {e}"}
@@ -299,6 +307,10 @@ class GraphWorkflow:
                 'deliverables': {**state.get('deliverables', {}), 'code': response},
             }
             log_node_execution(self.logger, "Code Generation (No Sandbox)", {"requirements": state['requirements'], "design": state['design']}, {"code": response}, time.time() - start_time)
+        except ValueError as e:
+            error_message = f"ERROR: LLM Model '{llm_config.model_id}' required for Programmer is not available. Please pull it using 'ollama pull {llm_config.model_id}'."
+            self.logger.error(error_message)
+            updated_state = {'code': error_message}
         except Exception as e:
             self.logger.fatal(f"Error in code generation (no sandbox): {e}")
             updated_state = {'code': f"Error in code generation (no sandbox): {e}"}
@@ -338,6 +350,10 @@ class GraphWorkflow:
                 'deliverables': {**state.get('deliverables', {}), 'test_results': full_test_results},
             }
             log_node_execution(self.logger, "Testing & Debugging", {"code": state['code'], "requirements": state['requirements']}, {"test_results": full_test_results}, time.time() - start_time)
+        except ValueError as e:
+            error_message = f"ERROR: LLM Model '{llm_config.model_id}' required for Tester is not available. Please pull it using 'ollama pull {llm_config.model_id}'."
+            self.logger.error(error_message)
+            updated_state = {'test_results': error_message}
         except Exception as e:
             self.logger.fatal(f"Error in testing: {e}")
             updated_state = {'test_results': f"Error in testing: {e}"}
@@ -367,6 +383,10 @@ class GraphWorkflow:
                 'deliverables': {**state.get('deliverables', {}), 'review_feedback': response},
             }
             log_node_execution(self.logger, "Review & Refinement", {"deliverables": deliverables_text}, {"review_feedback": response}, time.time() - start_time)
+        except ValueError as e:
+            error_message = f"ERROR: LLM Model '{llm_config.model_id}' required for Code Reviewer is not available. Please pull it using 'ollama pull {llm_config.model_id}'."
+            self.logger.error(error_message)
+            updated_state = {'review_feedback': error_message}
         except Exception as e:
             self.logger.fatal(f"Error in review: {e}")
             updated_state = {'review_feedback': f"Error in review: {e}"}
@@ -466,6 +486,10 @@ class GraphWorkflow:
                 'strategic_guidance': response,
             }
             log_node_execution(self.logger, "Reflector", {"quality_evaluations": evaluations_summary}, {"strategic_guidance": response}, time.time() - start_time)
+        except ValueError as e:
+            error_message = f"ERROR: LLM Model '{llm_config.model_id}' required for Reflector is not available. Please pull it using 'ollama pull {llm_config.model_id}'."
+            self.logger.error(error_message)
+            updated_state = {'strategic_guidance': error_message}
         except Exception as e:
             self.logger.fatal(f"Error in reflector node: {e}")
             updated_state = {'strategic_guidance': f"Error in reflector node: {e}"}

@@ -1,0 +1,40 @@
+product_manager:
+  name: Product Manager
+  model_id: llama3.2:3b
+  role: product_manager
+  temperature: 0.3
+architect:
+  name: System Architect
+  model_id: llama3.2:3b
+  role: architect
+  temperature: 0.2
+programmer:
+  name: Programmer
+  model_id: deepseek-coder:1.3b
+  role: programmer
+  temperature: 0.1
+tester:
+  name: Tester
+  model_id: llama3.2:3b
+  role: tester
+  temperature: 0.2
+reviewer:
+  name: Code Reviewer
+  model_id: llama3.2:3b
+  role: reviewer
+  temperature: 0.3
+distiller:
+  name: Distiller
+  model_id: llama3.2:3b
+  role: distiller
+  temperature: 0.2
+reflector:
+  name: Reflector
+  model_id: llama3.2:3b
+  role: reflector
+  temperature: 0.2
+quality_gate:
+  name: Quality Gate
+  model_id: gemma3:4b
+  role: quality_gate
+  temperature: 0.1

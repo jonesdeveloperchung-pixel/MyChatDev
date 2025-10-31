@@ -6,7 +6,8 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from config.settings import LLMConfig, SystemConfig, DEFAULT_CONFIG, AVAILABLE_LLMS
+from config.settings import LLMConfig, SystemConfig, DEFAULT_CONFIG
+from config.llm_profiles import AVAILABLE_LLMS_BY_PROFILE
 from models.llm_manager import LLMManager
 from workflow.quality_gate import QualityGate
 from workflow.sandbox import Sandbox
@@ -31,7 +32,17 @@ class TestGraphWorkflow:
     @pytest.fixture
     def llm_configs(self):
         """Sample LLM configurations for testing."""
-        return AVAILABLE_LLMS
+        # Provide mock LLMConfig for all roles that GraphWorkflow nodes might access
+        return {
+            "product_manager": LLMConfig(name="Mock PM", model_id="mock:pm", role="product_manager", temperature=0.5),
+            "architect": LLMConfig(name="Mock Architect", model_id="mock:arch", role="architect", temperature=0.3),
+            "programmer": LLMConfig(name="Mock Programmer", model_id="mock:prog", role="programmer", temperature=0.1),
+            "tester": LLMConfig(name="Mock Tester", model_id="mock:tester", role="tester", temperature=0.2),
+            "reviewer": LLMConfig(name="Mock Reviewer", model_id="mock:reviewer", role="reviewer", temperature=0.4),
+            "reflector": LLMConfig(name="Mock Reflector", model_id="mock:reflector", role="reflector", temperature=0.6),
+            "quality_gate": LLMConfig(name="Mock Quality Gate", model_id="mock:qg", role="quality_gate", temperature=0.1),
+            "distiller": LLMConfig(name="Mock Distiller", model_id="mock:dist", role="distiller", temperature=0.3),
+        }
 
     @pytest.fixture
     def llm_manager(self, system_config):
@@ -56,8 +67,10 @@ class TestGraphWorkflow:
     @pytest.fixture
     def graph_workflow(self, system_config, llm_manager, llm_configs, quality_gate, sandbox):
         """GraphWorkflow instance for testing."""
-        with patch('workflow.graph_workflow.QualityGate', return_value=quality_gate),
-             patch('workflow.graph_workflow.Sandbox', return_value=sandbox):
+        with (
+            patch('workflow.graph_workflow.QualityGate', return_value=quality_gate),
+            patch('workflow.graph_workflow.Sandbox', return_value=sandbox)
+        ):
             return GraphWorkflow(system_config, llm_configs)
 
     @pytest.fixture
@@ -108,8 +121,10 @@ class TestGraphWorkflow:
     async def test_testing_debugging_node(self, graph_workflow, initial_state, llm_manager, sandbox):
         """Test testing_debugging_node."""
         state = {**initial_state, 'code': "Test code", 'requirements': "Test requirements"}
-        with patch.object(llm_manager, 'generate_response', new_callable=AsyncMock) as mock_generate_response,
-             patch.object(sandbox, 'run_tests_in_sandbox', return_value="Test execution output") as mock_run_tests_in_sandbox:
+        with (
+            patch.object(llm_manager, 'generate_response', new_callable=AsyncMock) as mock_generate_response,
+            patch.object(sandbox, 'run_tests_in_sandbox', return_value="Test execution output") as mock_run_tests_in_sandbox
+        ):
             mock_generate_response.return_value = "Generated tests"
             result = await graph_workflow.testing_debugging_node(state)
             assert "Generated Tests:\nGenerated tests\n\nTest Execution Output:\nTest execution output" in result['test_results']

@@ -3,7 +3,7 @@
 Author: Jones Chung
 """
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 from pathlib import Path
 from pydantic import BaseModel
 
@@ -40,10 +40,10 @@ class SystemConfig(BaseModel):
     compression_chunk_size: int = 8192
 
     # Stagnation Detection
-    stagnation_iterations: int = 3 # Number of iterations to check for stagnation
+    stagnation_iterations: int = 3  # Number of iterations to check for stagnation
 
     # Human Approval
-    enable_human_approval: bool = False # Master switch for human approval step
+    enable_human_approval: bool = False  # Master switch for human approval step
 
     # System Prompt Management
     enable_system_prompt_files: bool = False # If True, system prompts are read from files; otherwise, internal defaults are used.

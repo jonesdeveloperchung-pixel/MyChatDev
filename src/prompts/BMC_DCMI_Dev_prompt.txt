@@ -1,0 +1,131 @@
+## 1. Project Overview
+
+> **Deliverable** – A fully bootable, modular operating system that runs on Baseboard Management Controller (BMC) SoCs (e.g., ARM Cortex‑M, ARMv7‑A) and implements the **DCMI** specification.  
+> **Key traits** –  
+> * Bare‑metal, no OS dependency  
+> * C / Rust / Assembly‑friendly (no external HALs)  
+> * Production‑grade build & test chain  
+> * Modular source layout + self‑documentation
+
+---
+
+## 2. Core System Layers (top‑down)
+
+| Layer | Responsibility | Main Artifacts | Dependencies |
+|-------|----------------|----------------|--------------|
+| **Bootloader** | 64‑bit ROM entry → CPU reset → minimal init → jump to OS | * `boot.S` / `boot.c` | None (direct hardware) |
+| **Hardware Abstraction** | Low‑level register access, memory map | * `mmu.c`, `intc.c`, `wdog.c` | Bootloader |
+| **Subsystems** | Feature‑specific functionality (DCMI, telemetry) | * `dcmiprocessor.c`, `sensor.c` | HAL |
+| **Drivers** | Peripheral control (UART, I2C, SPI, GPIO, ADC, LCD) | * `uart.c`, `i2c.c`, … | HAL |
+| **Scheduler** | Cooperative task management | * `sched.c` | HAL |
+| **Presentation** | Minimal GUI / framebuffer | * `fb.c`, `gfx.c` | Drivers |
+| **Communication** | Telemetry output (UART, IPMI‑LAN, framebuffer overlay) | * `comm.c` | Scheduler, Drivers |
+| **Build & Deploy** | Toolchain, image creation, CI | * `CMakeLists.txt`, `Makefile`, `.github/workflows` | All |
+
+> **Tip** – keep each directory self‑contained: `boot/`, `hal/`, `drivers/`, `dcmicore/`, `gui/`, `comm/`, `tests/`, `build/`.
+
+---
+
+## 3. Detailed Feature List
+
+### 3.1 Bare‑Metal Initialization  
+| Item | What to Do | Why | Implementation |
+|------|------------|-----|-----------------|
+| MMU setup | Page tables, cache coherency | Secure memory protection | `mmu.c` (C) + `mmu.S` (ASM) |
+| Interrupt controller | Vector table, priority assignment | ISR routing | `intc.c` |
+| Watchdog timer | Auto‑reset on hang | Reliability | `wdog.c` |
+| ROM/Boot ROM entry | Detect reset vector, bootstrap | Platform‑specific | `boot.S` |
+
+### 3.2 DCMI‑Compliant Subsystem  
+| Feature | Detail | Access Path | Notes |
+|---------|--------|-------------|-------|
+| Power monitoring | Current/voltage from ADC | `sensor.c` | Raw registers |
+| Thermal telemetry | On‑board sensors (temp, fan) | `sensor.c` | DCMI‑structured payload |
+| Health reporting | System status flags | `dcmiprocessor.c` | IPMI‑style message building |
+
+### 3.3 Memory‑Mapped I/O Drivers  
+| Peripheral | Driver | Key Register(s) | Build Note |
+|------------|--------|-----------------|------------|
+| UART | `uart.c` | `UART_DR`, `UART_FR` | No HAL |
+| I2C | `i2c.c` | `I2C_MDR`, `I2C_SDR` | |
+| SPI | `spi.c` | `SPI_CPSR`, `SPI_SR` | |
+| GPIO | `gpio.c` | `GPIO_DATA`, `GPIO_DIR` | |
+| ADC | `adc.c` | `ADC_DR`, `ADC_CR` | |
+| LCD/FB | `fb.c` | `LCD_CTL`, `LCD_FIFO` | |
+
+### 3.4 Minimal GUI Subsystem  
+| Option | How | Rendering Path |
+|--------|-----|----------------|
+| Static bitmap | Load from ROM, write to framebuffer | `gfx.c` |
+| Text string | Bitmap font array, centered draw | `gfx.c` |
+
+### 3.5 Cooperative Scheduler  
+| Feature | Config | Runtime |
+|---------|--------|---------|
+| Priority levels | Flat table (`task_cfg.bin`) | Round‑robin + `sched.c` |
+| Timing | `sleep_ms()`/`tick()` | SysTick or software counter |
+| Hook | Task start/stop callbacks | `sched.c` |
+
+### 3.6 Telemetry Output  
+| Channel | Protocol | Data format |
+|---------|----------|-------------|
+| UART | Raw bytes | DCMI JSON / binary |
+| IPMI‑over‑LAN | IPMI 2.0 | Encoded message |
+| Framebuffer overlay | Text + icon | DCMI status + logo |
+
+### 3.7 Bootable Image Generation  
+| Target | Tool | Steps |
+|--------|------|-------|
+| SPI flash | `dd`, `flashrom` | Flash image + bootloader |
+| eMMC | `mkfs.vfat`, `dd` | Partition + boot image |
+| Emulation | QEMU + Docker | `qemu-system-arm` + `-kernel` |
+| Build reproducibility | `nix`, `bazel` | Lockfile, deterministic outputs |
+
+---
+
+## 4. Development & Testing Workflow
+
+1. **Local CI** – `cargo test` + `make test` per module.  
+2. **Hardware testbench** – Connect a minimal BMC board, run `bootloader.bin`, verify UART output.  
+3. **Sensor polling** – Unit‑test `sensor.c` with mock registers.  
+4. **Watchdog reset** – Simulate a hang; verify auto‑reset.  
+5. **DCMI command handling** – Send test IPMI commands over UART; confirm correct payload.  
+6. **Frame rendering** – Verify bitmap and text appear on the LCD.  
+7. **Reproducible build** – Commit all source, run `nix build`, compare checksums.
+
+---
+
+## 5. Documentation Skeleton
+
+```
+/docs
+├─ architecture.md          # Layered design + data flows
+├─ build.md                 # Toolchain setup, environment variables
+├─ module_overview.md       # Summary of each directory
+├─ dcmiprotocol.md          # DCMI spec reference + mapping
+├─ telemetry.md             # UART/IPMI format details
+├─ gui.md                   # Framebuffer init & rendering API
+├─ scheduler.md             # Task API, priority config
+└─ dev_guidelines.md        # Coding style, commit conventions
+```
+
+---
+
+## 6. Compliance Checklist
+
+| Feature | DCMI Section | Status |
+|---------|--------------|--------|
+| Power Monitoring | 4.1 | ✅ |
+| Thermal Telemetry | 4.2 | ✅ |
+| Health Reporting | 4.3 | ✅ |
+| IPMI‑LAN transport | 5.1 | ✅ |
+| Watchdog watchdog | 3.1 | ✅ |
+| Firmware update over SPI | 6.1 | ✅ |
+
+---
+
+### Final Notes
+
+* **Modularity** – Each layer has a clean header/interface; replace the driver without touching the rest of the system.  
+* **Language choice** – Prefer Rust for safety‑critical drivers, C for tight loops, and Assembly for the first‑stage boot.  
+* **Extensibility** – Add new peripherals by creating a new folder under `drivers/` and exposing a clean API to `scheduler.c`.  

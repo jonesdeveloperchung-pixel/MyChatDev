@@ -1,0 +1,81 @@
+## **Sentinel PC Monitor – Lightweight Remote Monitoring Tool**
+
+### **1. Core Concept**
+Sentinel PC Monitor is a streamlined remote monitoring and control tool for individual PCs. It emphasizes **minimal system resource usage**, **simple remote visualization**, and **essential control features** for low-bandwidth or constrained environments.
+
+---
+
+### **2. User Interface (UI)**
+
+- **Compact Dashboard:** Displays essential KPIs (CPU, memory, disk I/O, network traffic) using lightweight SVG-based charts. Optional modules for temperature and power if supported by hardware.
+- **Simplified Device View:** Presents metrics with fixed time ranges (e.g., last 1h, 6h, 24h) to reduce rendering overhead.
+- **Alerts Panel:** Shows active alerts and basic history. Alert configuration is limited to key metrics to reduce complexity.
+- **Remote Control Panel:** Provides basic remote actions (reboot, shutdown, run predefined scripts) with confirmation prompts.
+- **Report Export (Optional):** Generates lightweight CSV reports for selected metrics. PDF export deferred to future versions.
+
+---
+
+### **3. Key Features & Functionality**
+
+- **Efficient Data Collection Agent:**
+  - Written in Go (preferred for performance) or Python (for ease of development).
+  - Polling intervals configurable (default: every 10 seconds).
+  - Uses OS-native APIs to avoid heavy dependencies.
+
+- **Basic Alerting System:**
+  - Threshold-based alerts for CPU, memory, disk, and network.
+  - Notifications via lightweight in-app messages or webhook integration (email optional).
+
+- **Remote Command Execution:**
+  - Supports basic commands only (reboot, shutdown, run script).
+  - Scripts must be predefined and whitelisted for safety.
+
+- **Historical Logging (Optional):**
+  - Stores last 7 days of data in local SQLite (default).
+  - PostgreSQL support available for extended logging.
+
+- **Secure Communication:**
+  - HTTPS with optional TLS certificate pinning.
+  - Minimal handshake overhead for low-bandwidth environments.
+
+- **Role-Based Access (Simplified):**
+  - Two roles: Admin (full control), Viewer (read-only).
+  - Local config file or token-based access control.
+
+---
+
+### **4. Technical Specifications**
+
+| Component         | Description                                                                 |
+|------------------|-----------------------------------------------------------------------------|
+| **Backend Server** | Node.js + Express.js with optional PostgreSQL or SQLite for data storage. |
+| **Monitoring Agent** | Go (preferred) or Python, cross-platform, <10MB footprint.                  |
+| **Communication** | HTTPS with optional compression (gzip).                                     |
+| **Frontend**      | React with minimal dependencies, optimized for low-memory devices.         |
+
+---
+
+### **5. Planned Integrations (Deferred for Resource-Constrained Deployments)**
+
+- **Cloud Sync (Optional):** Integration with AWS/Azure for centralized dashboards.
+- **Automation (Optional):** Task scheduling for updates, cleanup, etc., using cron-style rules.
+
+---
+
+### **6. Technology Stack Summary**
+
+| Layer      | Technology         |
+|------------|--------------------|
+| Frontend   | React (lightweight build) |
+| Backend    | Node.js, Express.js |
+| Database   | SQLite (default), PostgreSQL (optional) |
+| Agent      | Go / Python         |
+
+---
+
+### **Design Notes for Low-Resource Environments**
+
+- **Agent footprint <10MB**, CPU usage <2% during idle.
+- **Dashboard loads in <2s** on remote connections.
+- **No background services** unless explicitly enabled.
+- **All modules optional** and can be disabled via config.

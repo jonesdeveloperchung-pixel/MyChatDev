@@ -1,0 +1,134 @@
+## 1. Project Overview  
+
+**Build a bare‑metal RTOS for the ESP32 (Xtensa LX6/LX7)** that:
+
+| Feature | What it means | Why it matters |
+|---------|----------------|----------------|
+| **No external libs** | Only the compiler toolchain + your own code | Zero‑cost, maximum control |
+| **Rust‑centric** | Rust provides safety & speed | Modern language for low‑level work |
+| **Assembly bootloader** | Tiny init that hands off to Rust | Must run before any ESP‑IDF/ROM code |
+| **C interop** | Ability to call C functions from Rust & vice‑versa | Easier use of legacy drivers or future code |
+| **Dual‑core support** | Scheduler runs on both Xtensa cores | Full ESP32 utilization |
+| **Cross‑compilation & emulation** | Build on host → run on QEMU or real ESP32 | Rapid feedback loop |
+
+---
+
+## 2. Core System Components
+
+| Component | Key Tasks | Deliverable |
+|-----------|-----------|-------------|
+| **Bootloader** | • Initialize both cores, stack pointers, and the memory map.<br>• Skip the ROM and ESP‑IDF boot sequence.<br>• Set up UART for early console output.<br>• Jump to the Rust kernel entry point. | A single‑file Assembly (`boot.S`) that compiles with `clang` / `rustc`. |
+| **Kernel (Rust)** | • Define the task abstraction (task structs, context, state).<br>• Implement cooperative or pre‑emptive scheduler (configurable at compile‑time).<br>• Set up the interrupt vector table.<br>• Handle exceptions (hard faults, illegal instructions, etc.).<br>• Provide API for task creation, deletion, yielding. | `kernel.rs` + `scheduler.rs` + `interrupts.rs`. |
+| **C Layer** | • Small wrappers for legacy code that still needs C.<br>• Provide `extern "C"` entry points into Rust. | `c_wrapper.c` + headers. |
+| **Driver Scaffolds** | • Memory‑mapped I/O access to GPIO, SPI, I2C, Timers.<br>• Use Rust’s `volatile` types or `core::ptr` to read/write registers.<br>• Each peripheral gets its own module (e.g., `drivers/gpio.rs`). | `drivers/` folder with stubbed modules and a `mod.rs`. |
+| **Telemetry & Logging** | • UART‑based kernel log with optional buffer.<br>• Optional timestamp (e.g., from a hardware timer).<br>• Provide a lightweight `log!()` macro that can be disabled at compile time. | `logging.rs` + example log messages. |
+| **Build System** | • Cross‑compile Rust to Xtensa (using `rustc` + `llvm-objcopy`).<br>• Assemble the bootloader with `clang`/`as`.<br>• Link everything with `ld`.<br>• Generate a flash image (`bootloader.bin + kernel.bin`). | `Cargo.toml` + `Makefile` or `CMakeLists.txt`. |
+
+---
+
+## 3. Detailed Feature Checklist
+
+### 3.1 Bootloader
+- [ ] Set up two stack pointers (`esp_cpu0_stack`, `esp_cpu1_stack`).
+- [ ] Configure the memory map: flash, IRAM, DRAM, peripherals.
+- [ ] Initialize UART0 at 115200 baud, 8‑N‑1.
+- [ ] Print `"Bootloader ready"` for sanity check.
+- [ ] Jump to Rust entry point (`rust_kernel_entry`).
+
+### 3.2 UART Driver (Rust)
+- [ ] Direct register writes to `UART0` base address.
+- [ ] Implement `uart_putc` & `uart_puts`.
+- [ ] Ensure no dependency on external crates.
+
+### 3.3 Interrupt & Exception Handling
+- [ ] Populate the vector table in the `.vectors` section.
+- [ ] Provide default handlers that loop on fault.
+- [ ] Allow user to register ISR callbacks (function pointers).
+- [ ] For pre‑emptive scheduling: use timer interrupt as a pre‑empt signal.
+
+### 3.4 Scheduler
+- [ ] **Cooperative**: `task_yield()` swaps context on request.
+- [ ] **Pre‑emptive**: Timer ISR calls `schedule()` automatically.
+- [ ] Context switch: save/restore registers on the stack.
+- [ ] Keep a ready queue (simple linked list or circular buffer).
+
+### 3.5 Peripherals
+- [ ] `GPIO`: set mode, read/write pins.
+- [ ] `SPI` & `I2C`: driver scaffolds; implement basic init and transfer functions.
+- [ ] `Timers`: use `TIMER0` for system tick & timestamping.
+
+### 3.6 Logging
+- [ ] Macro `log!(level, "msg")` that writes to UART.
+- [ ] Optional ring buffer (configurable compile‑time flag).
+- [ ] Timestamp prefix from a high‑resolution timer (if enabled).
+
+### 3.7 Dual‑Core Scheduling
+- [ ] Each core runs its own scheduler instance.
+- [ ] Optional shared mailbox for inter‑core task coordination.
+- [ ] Load‑balancing can be added later.
+
+---
+
+## 4. Development & QA
+
+| Item | How to Ensure |
+|------|---------------|
+| **Cross‑compilation** | Use `rustup target add xtensa-esp32-none-elf`. |
+| **Reproducible builds** | Pin all toolchain versions (LLVM, Clang, Rust). |
+| **Testing** | • Unit tests for driver modules.<br>• Integration test: start a task that toggles a GPIO pin and verify via logic analyzer.<br>• QEMU test: run the flash image on an ESP32 emulator. |
+| **Documentation** | • README with build & flash instructions.<br>• Module docs (`///` comments). |
+| **Onboarding** | Provide a “Hello World” task example and a cheat‑sheet of register addresses. |
+
+---
+
+## 5. Example Project Layout
+
+```
+/rtos/
+├── Cargo.toml
+├── src/
+│   ├── main.rs            # Kernel entry point
+│   ├── kernel.rs
+│   ├── scheduler.rs
+│   ├── interrupts.rs
+│   ├── logging.rs
+│   └── drivers/
+│       ├── mod.rs
+│       ├── gpio.rs
+│       ├── spi.rs
+│       └── i2c.rs
+├── bootloader/
+│   └── boot.S
+├── tests/
+│   ├── gpio_test.rs
+│   └── scheduler_test.rs
+├── Makefile
+└── README.md
+```
+
+---
+
+## 6. Quick Start (Command Line)
+
+```bash
+# Build the bootloader
+make -C bootloader
+
+# Build the Rust kernel
+cargo build --release --target xtensa-esp32-none-elf
+
+# Create flash image
+make build_flash_image
+
+# Flash to device (or QEMU)
+make flash
+```
+
+---
+
+### Final Thoughts
+
+- Keep the **bootloader minimal**; any extra code should live in Rust/C.
+- Use **no‑std** Rust (`#![no_std]`) and avoid dynamic allocation unless you implement a custom allocator.
+- For the **interrupt vector table**, consider using the `#[link_section = ".vectors"]` attribute in Rust.
+- Document every public function with its **side‑effects** (e.g., which registers are touched).

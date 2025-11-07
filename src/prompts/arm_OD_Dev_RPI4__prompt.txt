@@ -1,0 +1,142 @@
+## 1. Project Overview
+Build a **bootable, modular Real‑Time Operating System (RTOS)** for the Raspberry Pi 4 (ARM Cortex‑A72, ARMv8‑A) using only **Rust, Assembly, and C**.  
+No external libraries, only the hardware‑specific registers you touch yourself.
+
+*Deliverable:* A production‑ready SD‑card image that boots the Pi, runs a Rust kernel, and can be extended by new drivers.
+
+---
+
+## 2. Core Architecture
+
+| Layer | Responsibility | Key Technologies |
+|-------|----------------|-------------------|
+| **Bootloader** | Loads the kernel, sets up the CPU, MMU, ELs, and interrupt controller | Assembly (for EL0→EL1 transition) |
+| **Kernel (Rust)** | Scheduler, memory manager, driver framework, logging | Rust (core logic), `extern "C"` for C interop |
+| **C Layer** | Legacy utilities, low‑level helpers (e.g., simple block‑copy, math) | C |
+| **Hardware Abstraction** | Register maps, bit‑field helpers | Rust (type‑safe abstractions) |
+| **Driver Module** | Device‑specific code (GPIO, UART, USB, SD, PCIe) | Rust + Assembly |
+| **User Space** | Optional: simple demos, tests | Rust (no external libs) |
+
+---
+
+## 3. Boot Process (Phase 1)
+
+1. **Pi Firmware Chain**  
+   - `bootcode.bin` → `start4.elf` → `config.txt` → **our bootloader** (custom `start.S`).
+2. **Assembly Bootloader**  
+   - Switches to **EL1**, configures **MMU** (identity mapping for now, later paging), and sets **SCTLR** flags.  
+   - Initializes **Generic Interrupt Controller (GIC)** – Distributor + CPU interface.  
+   - Calls the Rust entry point `rust_main`.
+3. **Rust Entry Point**  
+   - `#[no_mangle] extern "C" fn rust_main()` – the first Rust function executed.  
+   - Sets up panic handlers, global allocator, and calls `kernel::init()`.
+
+*Next Step:* Write and test the assembly bootloader on QEMU (`-M raspi4`), verify that `rust_main` is reached.
+
+---
+
+## 4. Peripheral Access (Phase 2)
+
+| Peripheral | Access Method | Driver Type |
+|------------|---------------|-------------|
+| **GPIO** | Memory‑mapped registers (`0x3F200000`‑`0x3F200FFF`) | Interrupt‑driven, non‑blocking |
+| **UART** | `0x3F201000` | Polling + ISR |
+| **USB** | USB 3.0 controller registers (BCM2711) | Full USB stack (EHCI+USBX) |
+| **SD/SDIO** | `0x7E200000` | Raw block read/write + simple FAT support |
+| **PCIe** | `0xFE000000` | PCIe Root Complex initialization + simple device enumeration |
+
+*Implementation notes:*
+
+- Wrap each peripheral in a **Rust struct** with `read_volatile`/`write_volatile`.  
+- Provide **bitfield helpers** via `bitflags`‑like macros (but no external crate).  
+- Interrupts: Use the GIC to map peripheral IRQs → Rust ISR functions (via `#[no_mangle]`).
+
+*Next Step:* Finish GPIO and UART drivers; write a simple test that toggles an LED and echoes serial input.
+
+---
+
+## 5. Minimal GUI Subsystem (Phase 3)
+
+1. **Mailbox Interface**  
+   - Call the firmware property tags (`0x400000` mailbox) to request a framebuffer.  
+   - Configure width, height, depth, and base address.
+2. **Framebuffer Rendering**  
+   - Allocate a **bitmap** buffer in the linear frame buffer memory.  
+   - Implement a simple **raster font** loader (e.g., 8×8 pixel glyphs) stored in a static array.  
+   - Provide a function `draw_text(&str)` that writes pixels into the buffer.
+3. **Display**  
+   - On boot, clear the frame buffer and call `draw_text("Welcome to Pi 4 RTOS")`.
+
+*Next Step:* Build the mailbox layer in Rust, then integrate the font renderer.
+
+---
+
+## 6. Preemptive Scheduler (Phase 4)
+
+- **Design**: Fixed‑priority round‑robin with a tickless **software timer**.  
+- **Task Control Block (TCB)**:  
+  ```rust
+  struct TCB {
+      stack_pointer: u64,
+      priority: u8,
+      state: TaskState,
+      // … other metadata
+  }
+  ```
+- **Context Switch**: Save/restore registers via inline Assembly (`push {x0–x30, fp, lr, spsr_el1}` / `pop`).  
+- **Configuration**:  
+  - Store task list in a **flat file** (`tasks.conf`) parsed at boot.  
+  - Each line: `priority,startup,routine_name,stack_size`.  
+- **Time‑slice**: Use a hardware timer (e.g., `cntpct_el0`) to trigger preemption.
+
+*Next Step:* Implement the scheduler skeleton and test with two dummy tasks that toggle LEDs.
+
+---
+
+## 7. Logging & Telemetry (Phase 5)
+
+- **Kernel‑level logger**:  
+  - `log::error!`, `log::warn!`, `log::info!` macros that write to UART or overlay on the framebuffer.  
+  - **Structured format**: `timestamp | level | file:line | message`.
+- **Optional Persistence**:  
+  - Raw block writes to the SD card (sector size 512 B).  
+  - Simple FAT‑like routines: `mkdir`, `write_file`, `append_log`.  
+  - Store logs in `/logs/boot.log`.
+
+*Next Step:* Wire the logger to UART, then enable optional SD persistence.
+
+---
+
+## 8. Build & Test Process (Phase 6)
+
+| Tool | Purpose |
+|------|---------|
+| `rustup` & `rustc` | Cross‑compile Rust for `aarch64-unknown-linux-gnu` (custom target). |
+| `gcc` | Assemble and link the Assembly bootloader. |
+| `qemu-system-aarch64` | Emulate Pi 4 for fast CI tests (`-M raspi4 -serial null`). |
+| `cargo test` | Run integration tests that boot the kernel in QEMU, check GPIO, UART, and scheduler behavior. |
+| `ci.yml` | GitHub Actions for reproducible builds. |
+
+*Documentation:*  
+- README with a quick‑start (“sdcard/boot.bin”, “config.txt”, “kernel.img”).  
+- API docs for the driver framework.  
+- Modular driver guide (how to add a new peripheral).
+
+*Next Step:* Set up the CI pipeline and write a minimal integration test that boots the kernel and checks the framebuffer text.
+
+---
+
+## 9. Deliverables Checklist
+
+| Item | Status |
+|------|--------|
+| Assembly bootloader + MMU init | ☐ |
+| GIC init & interrupt routing | ☐ |
+| GPIO & UART drivers | ☐ |
+| Mailbox + framebuffer + font renderer | ☐ |
+| Scheduler + task config | ☐ |
+| Kernel logger + SD persistence | ☐ |
+| CI pipeline & integration tests | ☐ |
+| Documentation & modular driver guide | ☐ |
+| Final bootable SD card image | ☐ |
+

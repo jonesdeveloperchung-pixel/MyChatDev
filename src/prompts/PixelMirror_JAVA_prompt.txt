@@ -1,0 +1,91 @@
+### **Software Name:** PixelMirror
+
+### **Platform:** Android (Targeting Android 13+ using Android SDK with Java)
+
+### **Core Functionality:**  
+Real-time desktop mirroring from a PC to an Android device, implemented in Java for portability, robust threading, and integration with Android’s native APIs. Prioritizes low latency and stable performance using efficient socket communication and bitmap rendering.
+
+---
+
+### **I. User Interface (UI) & User Experience (UX):**
+
+> UI built using Android SDK components in Java (e.g., `Activity`, `Fragment`, `ViewModel`, `RecyclerView`), with backend logic in Java and optional JNI for performance-critical tasks.
+
+- **Main Screen:**
+  - **Mirroring Mode Toggle:** Java `Button` triggers a service to switch between mirroring and basic display mode.
+  - **Resolution Selection:** `Spinner` widget bound to resolution presets; updates encoder settings via Java service.
+  - **Latency Indicator:** `ProgressBar` updated by a Java `Handler` or `LiveData` from latency monitoring thread.
+  - **Connection Status:** `TextView` displays connection state and IP, updated via Java socket events.
+  - **Settings Icon:** Opens a `DialogFragment` or navigates to a settings `Activity`.
+
+- **Settings Panel:**
+  - **Network Type:** `RadioGroup` for Wi-Fi vs Ethernet; selection updates Java network manager.
+  - **Static IP Configuration:** `EditText` input validated and applied via Java socket configuration.
+  - **Latency Optimization:** `Switch` toggles compression flags in Java encoder.
+  - **Audio Output Selection:** `Spinner` populated from Java audio device enumeration.
+  - **Color Calibration (Beta):** Optional integration with Java libraries or JNI bindings for calibration.
+
+- **Touchscreen Controls:**  
+  Java gesture listeners (`OnTouchListener`, `GestureDetector`) translate input into control packets for PC.
+
+---
+
+### **II. Technical Specifications & Features (Java Implementation Focus):**
+
+- **Remote Display Protocol:**  
+  Custom protocol implemented in Java using `Socket`, `ServerSocket`, and `DatagramSocket`. Optionally wraps RDP or raw bitmap streaming.
+
+- **Network Connection:**
+  - **Wi-Fi:** Java APIs (`WifiManager`, `ConnectivityManager`) for scanning and connection.
+  - **Ethernet:** Interface detection via `NetworkInterface` and socket binding.
+
+- **Audio Streaming:**  
+  RTP implemented in Java using `DatagramSocket`. Bluetooth audio routed via Android’s `AudioManager`.
+
+- **Data Compression:**  
+  Lossy compression via Java libraries (`Bitmap.compress`, custom JPEG/PNG encoders). Aggressive mode toggles resolution and quality.
+
+- **Latency Reduction:**  
+  Jitter buffer and packet loss compensation using Java `Queue`, `Thread`, and `TimerTask`.
+
+- **Error Handling:**  
+  Try-catch blocks, custom logging via `Logcat`, and reconnection logic using `BroadcastReceiver` and `Service`.
+
+- **Security:**  
+  TLS encryption via Java `SSLSocket`, `Cipher`, or integration with BouncyCastle.
+
+---
+
+### **III. Development & Future Enhancements (Java Roadmap):**
+
+- **Technology Stack:**
+  - **Core:** Java (Android SDK), multithreading, sockets, bitmap manipulation
+  - **UI:** Android Views, Fragments, ViewModels
+  - **Display Protocol:** Custom Java protocol or RDP wrapper
+
+- **Future Features:**
+  - **Multi-Window Mirroring:** Java-based window capture and multiplexing
+  - **HDR Support:** Java routines for HDR metadata parsing and rendering
+  - **Advanced Latency Optimization:** Implement DPMS and adaptive frame pacing in Java
+  - **Customizable Keyboard Shortcuts:** Java input mapping and serialization
+
+---
+
+### **IV. User Permissions (Android Manifest):**
+
+- Network Access (for Java socket communication)
+- Microphone (for audio feedback)
+- Display Over Android (for rendering mirrored frames)
+
+---
+
+### **Key Considerations for PixelMirror (Java Implementation):**
+
+- **Low Latency is Paramount:**  
+  Java’s threading and socket APIs enable responsive, real-time performance.
+
+- **User-Friendly Design:**  
+  Android SDK components ensure a familiar and intuitive UI.
+
+- **Robust Error Handling:**  
+  Java’s exception model and Android lifecycle awareness provide resilience and stability.

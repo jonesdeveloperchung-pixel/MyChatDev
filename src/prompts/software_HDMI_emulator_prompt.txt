@@ -1,0 +1,185 @@
+
+## Overview
+
+A **“software HDMI emulator”** is a software stack that sits **between the graphics card (GPU) and a physical HDMI monitor** and pretends to be a *real* HDMI link.  
+The stack is composed of three logical layers:
+
+| Layer | Purpose | What it does |
+|-------|---------|--------------|
+| **1. Driver Integration** | Intercepts GPU outputs and exposes a virtual monitor to the OS. | Hooks into the GPU driver (NVIDIA/AMD/Intel) via a kernel‑mode driver or user‑space shim. Creates a virtual “HDMI‑C‑PORT” device that the OS and the GPU believe is a physical HDMI monitor. |
+| **2. HDMI Protocol Engine** | Implements the HDMI 1.4 / 2.0 / 2.1 spec in software. | Provides EDID generation, link‑training, TMDS/HPD/CEC signalling, audio‑over‑HDMI, colour‑space conversions, and timing‑generation. |
+| **3. Transport Layer** | Sends the emulated video & audio to a downstream consumer. | Either writes to a virtual framebuffer, streams via UDP/TCP (HDMI‑over‑IP), or displays on a local virtual screen. |
+
+---
+
+## 1. Driver Integration
+
+### 1.1 Virtual Display Device
+
+- **Windows** – `VirtualDisplayDriver` (kernel mode) exposes a `DISPLAY` device with an *HDMI* type. The OS queries it for EDID, resolution limits, and audio capabilities.  
+- **Linux** – `khdmiemu.ko` (kernel module) creates a DRM connector with `DRM_MODE_CONNECTOR_HDMITX`. The kernel DRM/KMS subsystem treats it like any real HDMI output.  
+- **macOS** – `HDMIEmuDriver` implements the IOKit `IODisplay` interface, advertising an “HDMI” connector.
+
+### 1.2 GPU Hook
+
+The driver intercepts the **scan‑out buffer** from the GPU. On every frame flip, it receives a `DMA` buffer that contains the pixel data in the format requested by the OS (YUV420, RGB32, etc.). No pixel manipulation is done at this point.
+
+---
+
+## 2. HDMI Protocol Engine
+
+### 2.1 EDID Emulation
+
+- Generates a *full‑featured* EDID block that can be customized per‑profile:
+  - Supported resolutions (up to 8K, HDR10, HLG, Dolby Vision)
+  - Audio capabilities (stereo, 5.1, 7.1, 24‑bit, 192 kHz)
+  - HDMI version (1.4, 2.0, 2.1)
+  - 3D support, CEA modes, etc.
+
+The driver presents this EDID to the GPU; the GPU then configures the output accordingly.
+
+### 2.2 Link‑Training & Timing
+
+The HDMI spec requires a *handshake* between the source and sink:
+
+| Phase | What happens |
+|-------|--------------|
+| **HPD** | Host asserts High‑Power‑Detect (HPD) pin to signal a device is present. The emulation engine toggles a software HPD flag. |
+| **Link‑Training** | The source sends *training patterns* over TMDS (TMDS data, TMDS clock). The emulation engine decodes the pattern and responds with the requested link‑rate (12/18/27 Gbps). It also adjusts the *TMDS clock skew* and *eye‑diagram* parameters. |
+| **Video‑Enable** | After successful training, the source starts sending real video data. |
+
+In software the engine generates *virtual* TMDS packets (or just forwards the pixel data) and keeps track of the link‑state to emulate “hot‑plug” and “link‑failure” events.
+
+### 2.3 TMDS / HBR Encoding
+
+While the physical TMDS line signalling is electrical, we emulate it at the **data‑link layer**:
+
+1. **TMDS Encoding** – Input pixel data is converted to 10‑bit TMDS symbols (using 8b/10b encoding or HBR scrambling for HDMI 2.0+).
+2. **Color Space Conversion** – If the GPU provides YUV, the engine can convert to RGB or YCbCr based on EDID.  
+3. **Timing Generation** – The engine emits *horizontal* and *vertical* sync pulses (HSYNC/VSYNC) if required, or simply marks frames for downstream consumption.
+
+### 2.4 Audio‑over‑HDMI
+
+HDMI carries audio via a separate packet (HD Audio). The emulator:
+
+- Extracts the audio stream from the GPU (if present).
+- Encodes it using the HDMI Audio Transport (e.g., AAC, AC‑3, LPCM).
+- Packages it into the same packet stream as video, or streams it separately over the chosen transport.
+
+### 2.5 Consumer Electronics Control (CEC)
+
+CEC runs on a dedicated line, but for software emulation we model it as a *command queue*:
+
+- The GPU can send CEC commands (power‑on/off, volume, menu, etc.).
+- The engine interprets them and forwards to a downstream device (e.g., a virtual TV) or logs them for debugging.
+
+### 2.6 Dynamic Resizing & HDR Metadata
+
+The engine can dynamically change display mode:
+
+- On resolution change, the driver issues a mode‑switch; the engine re‑configures the TMDS pipeline.
+- For HDR, the engine parses HDR‑10 metadata (EOTF, SMPTE‑2109) and injects it into the HDMI stream (HDR‑10+, Dolby Vision).
+
+---
+
+## 3. Transport Layer
+
+The “output” of the HDMI emulation can be routed to any of the following:
+
+| Destination | How it works |
+|-------------|--------------|
+| **Virtual Framebuffer** | The engine writes pixel data into a kernel framebuffer (`/dev/fbX`). This is the simplest case for local testing. |
+| **HDMI‑over‑IP** | Encapsulate the HDMI packet stream into RTP/RTSP or proprietary UDP, then transmit over a network. The downstream host decodes the stream and renders on a real HDMI monitor or a software display. |
+| **Virtual Display** | The engine creates a window (e.g., using X11/Wayland on Linux or Win32 on Windows) that acts as a *soft monitor*. |
+| **Hardware Acceleration Bridge** | In a virtualization environment, the engine hands off the data to a virtual GPU that passes it to a guest OS (think QEMU's `virtio-gpu` or VMware's SVGA). |
+
+---
+
+## 4. Use‑Cases & Benefits
+
+| Use‑Case | How the Emulator Helps |
+|----------|------------------------|
+| **Hardware‑in‑the‑Loop (HIL) Testing** | Simulate a monitor with specific EDID, resolution, and audio settings without needing a physical screen. |
+| **Remote Display** | Stream the GPU output to a remote device (e.g., a mobile phone) via HDMI‑over‑IP, eliminating the need for a physical HDMI cable. |
+| **Automated Regression Testing** | Run visual‑regression tests by comparing frames from a real monitor with those produced by the emulator. |
+| **GPU Driver Development** | Test a new driver against a virtual HDMI sink that supports multiple HDMI versions, link‑training anomalies, etc. |
+| **Virtual Reality / 8K Content** | Emulate an 8K HDR display to test rendering pipelines before hardware is available. |
+
+---
+
+## 5. Challenges & Mitigations
+
+| Challenge | Mitigation |
+|-----------|------------|
+| **Real‑time Performance** | Use zero‑copy DMA, lock‑step frame buffering, and SIMD instructions for TMDS encoding. |
+| **Link‑Training Accuracy** | Implement a *link‑training simulator* that can emulate failures (loss of link‑clock, skew) to test the GPU’s response. |
+| **HDR & Color Management** | Keep an up‑to‑date LUT for HDR mastering, and expose APIs for the application to supply custom HDR metadata. |
+| **Compliance with Different HDMI Versions** | Build the protocol engine as a *modular* stack, with plug‑in modules for HDMI 1.4, 2.0, 2.1. |
+| **Security** | When streaming over IP, use TLS or DTLS to protect the HDMI stream. |
+
+---
+
+## 6. Example Implementation Sketch (Linux)
+
+```c
+// kernel module: khdmiemu.ko
+static struct drm_connector hdmi_connector;
+static struct drm_connector_funcs hdmi_funcs = {
+    .dpms = khdmi_dpms,
+    .detect = khdmi_detect,
+    .get_modes = khdmi_get_modes,
+    .mode_valid = khdmi_mode_valid,
+    // ... other callbacks
+};
+
+static int khdmi_detect(struct drm_connector *connector)
+{
+    // Return DETECTED if HPD flag is set
+    return connector->status == DRM_MODE_CONNECTED ? DRM_MODE_CONNECTED : DRM_MODE_DISCONNECTED;
+}
+
+static int khdmi_mode_valid(struct drm_connector *connector,
+                            struct drm_display_mode *mode)
+{
+    // Check mode against EDID table
+    return DRM_MODE_OK;
+}
+
+static int khdmi_pipe_update(struct drm_encoder *encoder,
+                             struct drm_framebuffer *fb,
+                             unsigned int flags)
+{
+    // Called by DRM on each frame flip
+    // 1. Grab pixel buffer (fb->obj)
+    // 2. Pass to HDMI Engine
+    hdmi_engine_process_frame(fb->obj);
+    return 0;
+}
+```
+
+The *HDMI Engine* is a user‑space daemon that performs TMDS encoding, link training simulation, and optionally forwards the stream to a UDP socket:
+
+```c
+int hdmi_engine_process_frame(struct drm_gem_object *obj)
+{
+    // 1. Map buffer into user space
+    // 2. Encode TMDS
+    tmds_encode(obj->ptr, obj->size);
+    // 3. Send over IP if configured
+    if (udp_socket) send_udp_frame(tmds_packet, udp_socket);
+    // 4. If local framebuffer, write to /dev/fbX
+}
+```
+
+---
+
+## 7. Summary
+
+A **software HDMI emulator** is essentially a *virtual HDMI sink* that:
+
+1. **Presents a realistic EDID** to the GPU.
+2. **Simulates the HDMI link‑handshake** (HPD, link‑training, TMDS encoding).
+3. **Handles video, audio, and CEC streams** as per HDMI 1.4/2.0/2.1.
+4. **Routes the resulting stream** to a framebuffer, network socket, or virtual display.
+
+While it cannot reproduce the exact electrical waveform of a real HDMI cable, it accurately models the logical behaviour of the link, enabling sophisticated testing, remote streaming, and driver development without hardware.

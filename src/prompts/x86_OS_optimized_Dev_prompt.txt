@@ -1,0 +1,151 @@
+## 1. Project Overview
+
+**Goal** – Build a minimal, bootable OS for the Intel‑compatible x86 family that starts in < 100 ms in QEMU, stays under 64 KB (assets excluded), and is easy to read, test, and extend.
+
+| Requirement | Quick‑look |
+|-------------|------------|
+| **Architecture** | x86 (32‑bit protected mode) |
+| **Language** | Assembly for bootloader, C/Rust for kernel (pick one or mix as needed) |
+| **Size** | < 64 KB binary (image assets excluded) |
+| **Boot time** | < 100 ms in QEMU |
+| **Output** | ISO image (optional) + raw floppy/USB image for boot |
+| **Documentation** | Annotated source, build scripts, role‑phase flow diagram |
+
+---
+
+## 2. System Architecture (Layered View)
+
+| Layer | Sub‑tasks | Deliverables |
+|-------|-----------|--------------|
+| **Bootloader** | 1. Custom MBR in 512 B.<br>2. Load kernel sector(s) into RAM.<br>3. Switch from real to protected mode (4 k page table, 32‑bit). | `bootloader.asm`, `bootloader.bin` |
+| **Hardware Init** | 1. Initialize PS/2 keyboard.<br>2. Setup ATA (SATA/IDE) for storage.<br>3. Select VGA graphics mode (e.g., 800×600 8‑bit palette). | `hw_init.c` or inline asm, `drivers.h` |
+| **Kernel** | 1. Static memory layout (stack, heap stub).<br>2. Deterministic round‑robin task scheduler (no dynamic heap).<br>3. Simple syscall table (optional). | `kernel.c`, `scheduler.c` |
+| **GUI / Display** | 1. Framebuffer abstraction (pointer to VGA memory).<br>2. Render bitmap (BMP/PPM loader) or fixed‑width font string. | `display.c`, `font.h` |
+| **Optional Features** | 1. BIOS device probing (PCI, IDE, etc.).<br>2. Store metadata in a small table (fallback to stubs when disabled). | `probe.c` |
+| **Diagnostics** | 1. Inline `printf`‑style logs to serial port (UART).<br>2. Optional on‑screen overlay (debug build only). | `debug.c` |
+| **Build System** | 1. Cross‑compiler toolchain (e.g., `i686-elf-gcc`).<br>2. Makefile / CMake to produce .bin, .iso.<br>3. QEMU/Bochs launch scripts. | `Makefile`, `build.sh`, `run_qemu.sh` |
+
+---
+
+## 3. Detailed Requirements
+
+### 3.1 Bootloader (Assembly)
+
+| Item | Description | Notes |
+|------|-------------|-------|
+| **MBR** | 512‑byte sector with boot signature (0xAA55). | Use a single sector to keep it simple. |
+| **Kernel Loader** | Read kernel from disk sectors into a fixed RAM location (e.g., 0x100000). | Use BIOS INT 13h to read sectors; no BIOS interrupt wrappers needed. |
+| **Mode Switch** | Setup a minimal page table, enable paging, load GDT/IDT, switch to protected mode. | Avoid any runtime allocation; hard‑code table entries. |
+
+### 3.2 Direct Hardware Init (C/Inline ASM)
+
+| Peripheral | Tasks | Constraints |
+|------------|-------|-------------|
+| PS/2 Keyboard | Reset, enable IRQ0, read scancodes into a small ring buffer. | No driver stack; raw port I/O. |
+| ATA (SATA/IDE) | Identify device, set 28‑bit LBA mode. | Direct port I/O, no lib. |
+| VGA | Switch to 8‑bit palette mode, allocate 800×600 framebuffer. | Write directly to memory at 0xA0000 or use GDI‑like palette. |
+
+### 3.3 Kernel Design
+
+| Feature | Implementation | Why |
+|---------|----------------|-----|
+| Static memory | Pre‑allocate stack & global data; no `malloc`. | Eliminates heap usage and fragmentation. |
+| Scheduler | Round‑robin with fixed time slice (e.g., 10 ms). | Deterministic, no dynamic priorities. |
+| Task context | 8 registers + EIP, ESP, EBP. | Small context switch overhead. |
+
+### 3.4 Minimal GUI Subsystem
+
+| Option | Steps | Asset | Size |
+|--------|-------|-------|------|
+| Bitmap | Load raw BMP/PPM header, copy pixel data to framebuffer. | ~2 KB for 256×256 image | Keeps binary small |
+| Font String | Fixed‑width bitmap font (8×16). Render “Hello x86” centered. | Font table ~1 KB | No image assets |
+
+### 3.5 Optional Device Probing
+
+| Probe | BIOS Call | Fallback | Size Impact |
+|-------|-----------|----------|-------------|
+| Disk | INT 13h AX=42h | Stub returns “No disk”. | < 200 B |
+| PCI | INT 13h AX=15h | Stub | < 200 B |
+
+### 3.6 Inline Logging / Diagnostics
+
+| Target | Implementation | Build Flag |
+|--------|----------------|------------|
+| Serial | `outb(0x3F8, ...)` | `-DDEBUG` |
+| On‑screen | Overlay at top of framebuffer | `-DDEBUG` |
+
+### 3.7 Build System & Emulation
+
+| Tool | Purpose | File |
+|------|---------|------|
+| Cross‑compiler | `i686-elf-gcc` | `Makefile` |
+| Linker script | Place sections at correct addresses | `link.ld` |
+| QEMU | Test boot | `run_qemu.sh` |
+| ISO generator | `genisoimage` | `iso.mk` |
+
+---
+
+## 4. Deliverables Checklist
+
+| Item | Description | Owner |
+|------|-------------|-------|
+| `bootloader.asm` | 512‑B MBR + protected‑mode switch | *Bootloader dev* |
+| `kernel.c` | Static kernel + scheduler | *Kernel dev* |
+| `hw_init.c` | PS/2, ATA, VGA init | *Hardware dev* |
+| `display.c` | Bitmap/Font renderer | *GUI dev* |
+| `probe.c` | BIOS probing, stubs | *Optional* |
+| `debug.c` | Conditional logging | *Optional* |
+| `Makefile` | Cross‑compile, link, ISO | *Build dev* |
+| `run_qemu.sh` | One‑click boot | *All* |
+| Documentation | Code comments + README + diagram | *All* |
+
+---
+
+## 5. Suggested Development Phases (Small Teams)
+
+1. **Phase 0 – Setup**  
+   *Toolchain, repo, basic bootloader template.*  
+2. **Phase 1 – Bootloader & Mode Switch**  
+   *Get a working `.bin` that enters protected mode.*  
+3. **Phase 2 – Hardware Init**  
+   *Implement PS/2, ATA, VGA.*  
+4. **Phase 3 – Kernel Core**  
+   *Static memory, simple scheduler.*  
+5. **Phase 4 – GUI Rendering**  
+   *Bitmap loader, font renderer.*  
+6. **Phase 5 – Optional Probing**  
+   *Add device queries, stubs.*  
+7. **Phase 6 – Diagnostics**  
+   *Serial and screen logs, debug flag.*  
+8. **Phase 7 – Build & CI**  
+   *Automated build, QEMU/Bochs tests.*  
+
+Each phase can be broken into *story points* or *tasks* (e.g., “write BIOS disk read wrapper”) so that you can assign to 1–2 people and measure progress.
+
+---
+
+### Quick Tips for Staying Under 64 KB
+
+| Area | Tip | Example |
+|------|-----|---------|
+| **Code** | Use `-Os` or `-O2` with `-ffunction-sections` and `--gc-sections`. | `gcc -Os -ffunction-sections -fdata-sections -Wl,--gc-sections` |
+| **Assets** | Keep bitmap < 4 KB; use PPM (plain ASCII) for readability. | 256×256 8‑bit image = 65 536 bytes → use 128×128 → 16 384 B |
+| **Strings** | Put all user‑visible text in a single read‑only section. | `static const char *msg = "Hello x86";` |
+| **Stubs** | Compile optional modules out of the main binary; link only when needed. | `-DPROBE_OFF` |
+
+---
+
+## 6. Final Documentation Layout
+
+1. **README.md** – High‑level overview, build & run instructions.  
+2. **doc/architecture.md** – Layered diagram, module responsibilities.  
+3. **src/** – Source files, with inline comments.  
+4. **build/** – Makefile, cross‑toolchain config.  
+5. **assets/** – Small BMP/PPM images, fonts.  
+6. **scripts/** – `run_qemu.sh`, `iso.mk`.  
+
+---
+
+### Summary
+
+By splitting the spec into **layers** and **phases**, you get a natural decomposition that is easy for a small team to tackle. Each component has a clear owner, a minimal interface, and a documented size/behavior target. This structure also makes it trivial to add or remove optional features (e.g., BIOS probing) without blowing up the binary. Happy hacking!

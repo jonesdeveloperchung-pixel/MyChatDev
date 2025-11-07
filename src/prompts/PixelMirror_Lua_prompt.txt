@@ -1,0 +1,91 @@
+### **Software Name:** PixelMirror
+
+### **Platform:** Android (Targeting Android 13+ via Android NDK with Lua scripting layer)  
+Optional PC-side components built with C/C++ and LuaJIT for high-performance scripting.
+
+### **Core Functionality:**  
+Real-time desktop mirroring from a PC to an Android device, using Lua for UI logic, configuration, and control flow. Performance-critical modules (e.g., rendering, compression, networking) are implemented in C/C++ and exposed to Lua via FFI or bindings.
+
+---
+
+### **I. User Interface (UI) & User Experience (UX):**
+
+> UI logic and state management written in Lua, using frameworks like LÖVE (for desktop) or custom Lua bindings to Android views via JNI.
+
+- **Main Screen:**
+  - **Mirroring Mode Toggle:** Lua function triggers native backend to switch framebuffer source.
+  - **Resolution Selection:** Lua dropdown updates resolution config and calls C encoder API.
+  - **Latency Indicator:** Lua timer updates visual bar based on latency metrics from C module.
+  - **Connection Status:** Lua reads socket state and IP from native layer and updates UI.
+  - **Settings Icon:** Opens Lua-driven settings panel.
+
+- **Settings Panel:**
+  - **Network Type:** Lua radio buttons update network mode flags.
+  - **Static IP Configuration:** Lua input validated and passed to C network config.
+  - **Latency Optimization:** Lua toggle sets compression flags in encoder module.
+  - **Audio Output Selection:** Lua dropdown populated from native audio device list.
+  - **Color Calibration (Beta):** Lua script interfaces with calibration routines via FFI.
+
+- **Touchscreen Controls:**  
+  Lua gesture handlers map input events to control packets sent via native socket API.
+
+---
+
+### **II. Technical Specifications & Features (Lua Integration Focus):**
+
+- **Remote Display Protocol:**  
+  Lua scripts orchestrate session setup and teardown. Core protocol implemented in C/C++ and exposed via LuaJIT FFI or Lua bindings.
+
+- **Network Connection:**
+  - **Wi-Fi/Ethernet:** Lua config scripts manage interface selection; C handles socket operations.
+
+- **Audio Streaming:**  
+  Lua controls RTP session setup; audio streaming handled by native C modules.
+
+- **Data Compression:**  
+  Lua toggles compression modes; encoding performed by C libraries (e.g., libjpeg-turbo, zstd).
+
+- **Latency Reduction:**  
+  Lua manages buffer thresholds and retry logic; jitter buffer implemented in C.
+
+- **Error Handling:**  
+  Lua scripts monitor error states and trigger recovery routines exposed by native modules.
+
+- **Security:**  
+  Lua config sets encryption parameters; C modules handle TLS or symmetric encryption.
+
+---
+
+### **III. Development & Future Enhancements (Lua Roadmap):**
+
+- **Technology Stack:**
+  - **Core:** Lua 5.4 or LuaJIT, C/C++ backend, Android NDK
+  - **UI:** Lua-based rendering (LÖVE, custom bindings)
+  - **Display Protocol:** Lua orchestration over native framebuffer streaming
+
+- **Future Features:**
+  - **Multi-Window Mirroring:** Lua session manager coordinates multiple streams
+  - **HDR Support:** Lua toggles HDR mode; C handles tone mapping
+  - **Advanced Latency Optimization:** Lua scripts manage power-saving and pacing
+  - **Customizable Keyboard Shortcuts:** Lua config maps input to PC control packets
+
+---
+
+### **IV. User Permissions (Android Manifest):**
+
+- Network Access (for Lua-controlled socket layer)
+- Microphone (for audio feedback)
+- Display Over Android (for rendering mirrored frames via Lua/C integration)
+
+---
+
+### **Key Considerations for PixelMirror (Lua Implementation):**
+
+- **Low Latency is Paramount:**  
+  Lua enables fast scripting and control flow; C handles performance-critical paths.
+
+- **User-Friendly Design:**  
+  Lua’s simplicity makes UI logic and configuration highly maintainable.
+
+- **Robust Error Handling:**  
+  Lua scripts monitor system state and invoke recovery routines exposed by native modules.

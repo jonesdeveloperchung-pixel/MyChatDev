@@ -1,0 +1,91 @@
+### **Software Name:** PixelMirror
+
+### **Platform:** Android (Targeting Android 13+ using Android SDK with Kotlin)
+
+### **Core Functionality:**  
+Real-time desktop mirroring from a PC to an Android device, implemented in **Kotlin** for concise syntax, coroutine-based concurrency, and seamless integration with Android’s native APIs. Prioritizes low latency and stable performance using efficient socket communication and bitmap rendering.
+
+---
+
+### **I. User Interface (UI) & User Experience (UX):**
+
+> UI built using Android Jetpack components in Kotlin (e.g., `Activity`, `Fragment`, `ViewModel`, `RecyclerView`, `StateFlow`), with backend logic in Kotlin and optional JNI for performance-critical tasks.
+
+- **Main Screen:**
+  - **Mirroring Mode Toggle:** Kotlin `Button` triggers a `Service` or `ForegroundService` to switch between mirroring and basic display mode.
+  - **Resolution Selection:** `Spinner` or `MaterialDropDownMenu` bound to resolution presets; updates encoder settings via Kotlin service.
+  - **Latency Indicator:** `ProgressBar` updated by `LiveData` or `StateFlow` from a coroutine-based latency monitoring job.
+  - **Connection Status:** `TextView` displays connection state and IP, updated via Kotlin socket events exposed through `Flow`.
+  - **Settings Icon:** Opens a `DialogFragment` or navigates to a settings `Activity` using Jetpack Navigation.
+
+- **Settings Panel:**
+  - **Network Type:** `RadioGroup` for Wi-Fi vs Ethernet; selection updates Kotlin network manager.
+  - **Static IP Configuration:** `EditText` input validated and applied via Kotlin socket configuration.
+  - **Latency Optimization:** `Switch` toggles compression flags in Kotlin encoder logic.
+  - **Audio Output Selection:** `Spinner` populated from Kotlin audio device enumeration.
+  - **Color Calibration (Beta):** Optional integration with Kotlin libraries or JNI bindings for calibration.
+
+- **Touchscreen Controls:**  
+  Kotlin gesture listeners (`OnTouchListener`, `GestureDetector`) translate input into control packets for PC.
+
+---
+
+### **II. Technical Specifications & Features (Kotlin Implementation Focus):**
+
+- **Remote Display Protocol:**  
+  Custom protocol implemented in Kotlin using `Socket`, `ServerSocket`, and `DatagramSocket`. Optionally wraps RDP or raw bitmap streaming.
+
+- **Network Connection:**
+  - **Wi-Fi:** Kotlin APIs (`WifiManager`, `ConnectivityManager`) for scanning and connection.
+  - **Ethernet:** Interface detection via `NetworkInterface` and socket binding.
+
+- **Audio Streaming:**  
+  RTP implemented in Kotlin using `DatagramSocket`. Bluetooth audio routed via Android’s `AudioManager`.
+
+- **Data Compression:**  
+  Lossy compression via Kotlin extensions (`Bitmap.compress`, custom JPEG/PNG encoders). Aggressive mode toggles resolution and quality.
+
+- **Latency Reduction:**  
+  Jitter buffer and packet loss compensation using Kotlin coroutines, `Channel`, and structured concurrency instead of raw threads.
+
+- **Error Handling:**  
+  `try/catch` blocks, structured exception handling with coroutines, custom logging via `Logcat`, and reconnection logic using `BroadcastReceiver` and `Service`.
+
+- **Security:**  
+  TLS encryption via Kotlin’s interoperability with `SSLSocket`, `Cipher`, or integration with BouncyCastle.
+
+---
+
+### **III. Development & Future Enhancements (Kotlin Roadmap):**
+
+- **Technology Stack:**
+  - **Core:** Kotlin (Android SDK), coroutines, sockets, bitmap manipulation
+  - **UI:** Jetpack Compose (optional), Views, Fragments, ViewModels, StateFlow
+  - **Display Protocol:** Custom Kotlin protocol or RDP wrapper
+
+- **Future Features:**
+  - **Multi-Window Mirroring:** Kotlin-based window capture and multiplexing
+  - **HDR Support:** Kotlin routines for HDR metadata parsing and rendering
+  - **Advanced Latency Optimization:** Implement DPMS and adaptive frame pacing with coroutines
+  - **Customizable Keyboard Shortcuts:** Kotlin input mapping and serialization
+
+---
+
+### **IV. User Permissions (Android Manifest):**
+
+- Network Access (for Kotlin socket communication)  
+- Microphone (for audio feedback)  
+- Display Over Android (for rendering mirrored frames)  
+
+---
+
+### **Key Considerations for PixelMirror (Kotlin Implementation):**
+
+- **Low Latency is Paramount:**  
+  Kotlin coroutines and structured concurrency enable responsive, real-time performance.
+
+- **User-Friendly Design:**  
+  Jetpack components and Kotlin DSLs ensure a modern, intuitive UI.
+
+- **Robust Error Handling:**  
+  Kotlin’s null-safety, sealed classes, and coroutine exception handling provide resilience and stability.

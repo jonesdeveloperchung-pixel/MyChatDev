@@ -1,50 +1,37 @@
-# Gitignore for Python projects
-
-# Byte-code files
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
 
-# Virtual environment
-venv/
-.venv/
-
-# Environment variables
-.env
-*.env
-
-# IDE-specific files
-.idea/
-.vscode/
-
-# OS-specific files
-.DS_Store
-Thumbs.db
-
-# Test and coverage reports
+# Pytest
 .pytest_cache/
-.mypy_cache/
-htmlcov/
-.coverage
-
-# Distribution and build artifacts
-dist/
-build/
-*.egg-info/
-
-# Project-specific generated files
-logs/
-deliverables/
-mockups/
-
-# Databases
-*.sqlite3
-*.db
 
 # Logs
 *.log
 
-# Jupyter notebooks
-.ipynb_checkpoints/
+# Deliverables
+deliverables/
+
+# Custom profiles
+my_custom_profile.yaml
+
+# Profiling
+*.prof
+*.cprof
+
+# Virtual environments
+.venv*/
+venv/
+ENV/
+env/
+
+# Distribution / packaging
+*.egg-info/
+dist/
+build/
+
+# Compiled libraries
+*.so
+*.dll
+*.exe

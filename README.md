@@ -2,6 +2,11 @@
 
 A Python program that enables cooperative interaction between multiple locally hosted LLMs using Ollama, orchestrated through LangGraph workflows.
 
+## Author
+
+- **Author:** Jones Chung
+- **Email:** jones.developer.chung@gmail.com
+
 ## 🏗️ Architecture
 
 The system implements a **Multi-Layered Validation Workflow** where different LLMs take on specialized roles, orchestrated through a **graph-based state machine using LangGraph**. The key to this architecture is a series of fast, iterative loops that validate the work at each stage, including a sandboxed environment for code development and a reflective mechanism for overcoming stagnation.
@@ -20,25 +25,24 @@ The system implements a **Multi-Layered Validation Workflow** where different LL
 
 ```
 MyChatDev/
-├── main.py                    # Entry point and orchestration
+├── src/
+│   ├── cli.py                     # Main CLI entry point and orchestration
+│   ├── main.py                    # Main application entry point
+│   ├── example_usage.py           # Example usage script
+│   ├── config/                  # Configuration files
+│   ├── workflow/                # Workflow logic
+│   ├── utils/                   # Utility functions
+│   ├── models/                  # LLM models
+│   └── prompts/                 # Prompt templates
+├── tests/
+│   └── ...                      # Test files
+├── docs/
+│   └── ...                      # Documentation files
+├── logs/
+│   └── ...                      # Log files
+├── .gitignore                 # Git ignore file
 ├── requirements.txt           # Python dependencies
-├── README.md                 # This file
-├── config/
-│   └── settings.py           # Configuration management
-├── models/
-│   └── llm_manager.py        # LLM communication and management
-├── workflow/
-│   ├── graph_workflow.py     # LangGraph node implementations and workflow orchestration
-│   ├── sandbox.py            # Sandboxed execution environment for Programmer agent
-│   └── quality_gate.py       # Quality control and gatekeeper
-├── utils/
-│   ├── logging_config.py     # Logging configuration
-│   └── prompts.py           # Centralized prompt management
-└── tests/
-    └── test_llm_manager.py   # Unit tests
-    └── test_sandbox.py       # Unit tests for Sandbox
-    └── test_graph_workflow.py # Unit tests for GraphWorkflow
-    └── test_quality_gate.py  # Unit tests for QualityGate
+└── README.md                  # This file
 ```
 
 ## 🚀 Installation
@@ -60,147 +64,191 @@ MyChatDev/
 
 ## 🎯 Usage
 
-### Basic Usage
+## 🚀 Usage
 
-```python
-import asyncio
-from workflow.graph_workflow import GraphWorkflow # Updated import
-from config.settings import DEFAULT_CONFIG
+The Cooperative LLM CLI now features a structured command-line interface with sub-commands for different functionalities.
 
-async def main():
-    # Initialize workflow
-    workflow = GraphWorkflow(DEFAULT_CONFIG) # Updated class
-    
-    # Define your requirements
-    user_input = """
-    Create a Python web scraper that can:
-    1. Extract product information from e-commerce websites
-    2. Handle rate limiting and respect robots.txt
-    3. Store data in a SQLite database
-    4. Include error handling and logging
-    """
-    
-    # Execute workflow
-    final_state = await workflow.run(user_input)
-    
-    # Access deliverables
-    print("Requirements:", final_state.deliverables['requirements'])
-    print("Design:", final_state.deliverables['design'])
-    print("Code:", final_state.deliverables['code'])
-    print("Test Results:", final_state.deliverables['test_results'])
-    print("Review Feedback:", final_state.deliverables['review_feedback'])
-    print("Strategic Guidance:", final_state.deliverables['strategic_guidance'])
+### Global Options
 
-asyncio.run(main())
-```
+*   `--version`: Display the CLI version.
+*   `--help`: Show general help message.
 
-### Running the Complete System
+### `run` command: Execute the cooperative LLM workflow
 
-```bash
-python main.py
-```
+This is the primary command for executing the multi-agent LLM workflow.
 
-### Running via CLI
+**Examples:**
 
-The `cli.py` script provides a command-line interface to run the Cooperative LLM System with various configurable parameters.
+*   **1. Run with default settings (uses built-in prompt and High_Reasoning profile):**
+    ```bash
+    python src/cli.py run
+    ```
 
-```bash
-python cli.py -P <profile_name> -U <prompt_file_path> --debug --url <ollama_host_url> --max_iterations <num> --enable_sandbox <true/false> ...
-```
+*   **2. Run with a custom prompt file and a specific built-in profile:**
+    ```bash
+    python src/cli.py run -U prompts/my_feature.txt -P Fast_Lightweight
+    ```
 
-**Key CLI Arguments:**
+*   **3. Run with a custom profile file and increased iterations:**
+    ```bash
+    python src/cli.py run -F my_custom_profile.yaml -M 5
+    ```
 
-*   `-P, --profile <profile_name>`: Selects an LLM profile (e.g., `high_reasoning`, `medium_reasoning`, `low_reasoning`).
-*   `-U, --user_prompt <prompt_file_path>`: Path to a file containing the user prompt.
-*   `--debug`: Enables debug-level logging.
-*   `-O, --ollama_url <ollama_host_url>`: Specifies the URL of the Ollama host (e.g., `http://localhost:11434`).
-*   `--max_iterations <num>`: Maximum number of iterations for the workflow.
-*   `--enable_sandbox <true/false>`: Enable or disable the sandboxed development environment.
-*   `--quality_threshold <float>`: Quality score threshold for the Quality Gate.
-*   `--change_threshold <float>`: Change magnitude threshold for the Quality Gate (stagnation).
-*   `--stagnation_iterations <num>`: Number of iterations to check for stagnation.
-*   `-Y, --enable_system_prompt_files <true/false>`: Enable or disable reading system prompts from files. If `false`, internal default system prompts are used.
-*   `--enable_mockup_generation <true/false>`: Enable or disable generating mockup data for debugging graph nodes.
+*   **4. Run in demo mode (quick, lightweight settings):**
+    ```bash
+    python src/cli.py run --demo
+    ```
+    This uses a default prompt and the `Fast_Lightweight` profile, with shorter iterations and disabled sandboxing/human approval for a quick demonstration.
 
-**Example:**
+*   **5. Run with debug logging enabled:**
+    ```bash
+    python src/cli.py run --debug -U prompts/my_feature.txt
+    ```
 
-```bash
-python cli.py -P low_reasoning -U prompts/python_factorial.txt -D -O http://localhost:11434 --max_iterations 3 -S true -T 3
-```
+*   **6. Simulate a run without execution or saving deliverables (Dry Run):**
+    ```bash
+    python src/cli.py run --dry-run -U prompts/my_feature.txt
+    ```
+
+*   **7. Specify a custom output directory for deliverables:**
+    ```bash
+    python src/cli.py run -U prompts/my_feature.txt --output-dir my_custom_deliverables
+    ```
+
+### `profile` command: Manage LLM profiles
+
+This command allows you to list, show details, add, or delete LLM profiles.
+
+**Examples:**
+
+*   **1. List all available LLM profiles (built-in and user-defined):**
+    ```bash
+    python src/cli.py profile list
+    ```
+
+*   **2. Display details of a specific LLM profile:**
+    ```bash
+    python src/cli.py profile show High_Reasoning
+    ```
+
+*   **3. Add a custom LLM profile from a YAML file:**
+    ```bash
+    python src/cli.py profile add my_new_profile /path/to/my_profile.yaml
+    ```
+    Custom profiles are stored in `~/.coopllm/profiles/`.
+
+*   **4. Delete a user-defined LLM profile:**
+    ```bash
+    python src/cli.py profile delete my_old_profile
+    ```
+
+### `config` command: Manage system configurations
+
+This command allows you to view, set, edit, or reset system-wide configurations.
+
+**Examples:**
+
+*   **1. Display the current effective system configuration:**
+    ```bash
+    python src/cli.py config show
+    ```
+
+*   **2. Set a specific configuration key-value pair:**
+    ```bash
+    python src/cli.py config set ollama_host http://192.168.1.100:11434
+    ```
+
+*   **3. Open the user configuration file in a text editor:**
+    ```bash
+    python src/cli.py config edit
+    ```
+    This opens `~/.coopllm/config.yaml`.
+
+*   **4. Reset user configuration to default settings:**
+    ```bash
+    python src/cli.py config reset
+    ```
+
+### `debug` command: Diagnostic and debugging utilities
+
+This command provides tools for debugging the CLI.
+
+**Examples:**
+
+*   **1. Display the content of the debug log file:**
+    ```bash
+    python src/cli.py debug log
+    ```
+
+### `info` command: Display system information
+
+This command provides information about the CLI and the system environment.
+
+**Examples:**
+
+*   **1. Display CLI version:**
+    ```bash
+    python src/cli.py info version
+    ```
+
+*   **2. Display system and environment details:**
+    ```bash
+    python src/cli.py info system
+    ```
 
 ## 🔧 Configuration
 
-### LLM Model Assignment
+The Cooperative LLM CLI provides dedicated sub-commands to manage LLM profiles and system-wide configurations.
 
-Edit `config/llm_profiles.py` to customize model assignments. For best performance, use a mix of powerful models for complex tasks and smaller, faster models for analytical tasks.
+### LLM Profiles
 
-You can select a profile using the `-P` or `--profile` command-line argument in `cli.py`. Available profiles include: `high_reasoning` (default), `medium_reasoning`, `low_reasoning`, `gemma3_phi4_gpt`, `gpt_oss`, `llama32`, `lightweight`, and `compliance`.
+LLM profiles define the specific LLM models and parameters assigned to each agent role (e.g., Product Manager, Programmer, Tester). You can manage these profiles using the `profile` sub-command.
 
-Example:
-```bash
-python cli.py -P low_reasoning -U prompts/my_prompt.txt
-```
+*   **Listing Profiles:** To see all available built-in and user-defined profiles:
+    ```bash
+    python src/cli.py profile list
+    ```
 
-The structure of a profile in `config/llm_profiles.py` is a dictionary mapping role names to `LLMConfig` objects. Each `LLMConfig` specifies the model ID, temperature, and other parameters for a particular role.
+*   **Showing Profile Details:** To inspect the configuration of a specific profile:
+    ```bash
+    python src/cli.py profile show High_Reasoning
+    ```
 
-```python
-# Example of a profile (from config/llm_profiles.py)
-LLM_CONFIGS_HIGH_REASONING: Dict[str, LLMConfig] = {
-    "product_manager": LLMConfig(
-        name="Product Manager",
-        model_id="gemma3:12b",  # balance of reasoning + efficiency
-        role="product_manager",
-        temperature=0.4,  # slightly higher for creativity
-    ),
-    # ... (other roles) ...
-}
-```
+*   **Adding Custom Profiles:** You can define your own profiles in YAML files and add them to the CLI:
+    ```bash
+    python src/cli.py profile add MyCustomProfile /path/to/my_profile.yaml
+    ```
+    Custom profiles are stored in `~/.coopllm/profiles/`.
+
+*   **Deleting Custom Profiles:** To remove a user-defined profile:
+    ```bash
+    python src/cli.py profile delete MyCustomProfile
+    ```
 
 ### System Parameters
 
-Edit `config/settings.py` to customize system-wide parameters.
+System-wide parameters (e.g., Ollama host, iteration limits, sandbox settings) are managed via the `config` sub-command. These settings are stored in `~/.coopllm/config.yaml`.
 
-Alternatively, you can override these parameters directly from the command line when running `cli.py`.
+*   **Showing Current Configuration:** To view the active system configuration:
+    ```bash
+    python src/cli.py config show
+    ```
 
-```bash
-python cli.py --url http://192.168.16.120:11434 --max_iterations 10 --enable_sandbox false --quality_threshold 0.9
-```
+*   **Setting Parameters:** To change a specific parameter:
+    ```bash
+    python src/cli.py config set ollama_host http://192.168.1.100:11434
+    ```
 
-**System Prompt Management:** The `enable_system_prompt_files` setting (default `False`) controls whether system prompts are loaded from internal defaults or external files. By default, internal system prompts are used for all LLM roles. When `enable_system_prompt_files` is `True`, the system attempts to load prompts from `config/system_<role>_prompt.txt` files. The system logs (at INFO level) whether an internal or external system prompt is being used for each role.
+*   **Editing Configuration File:** To open the configuration file in your default editor for advanced changes:
+    ```bash
+    python src/cli.py config edit
+    ```
 
-Here's an example of the `DEFAULT_CONFIG` structure, which corresponds to the configurable parameters:
+*   **Resetting Configuration:** To revert all user-defined settings to system defaults:
+    ```bash
+    python src/cli.py config reset
+    ```
 
-```python
-DEFAULT_CONFIG = SystemConfig(
-    ollama_host="http://localhost:11434",  # Can be overridden by -O, --ollama_url CLI argument
-    max_iterations=5,
-    quality_threshold=0.8,
-    change_threshold=0.1,
-    log_level="INFO", # Can be overridden by -D, --debug CLI argument
-
-    # Sandbox Settings
-    enable_sandbox=True,                # Master switch for the sandboxed development environment
-
-    # Compression Settings
-    enable_compression=True,
-    compression_threshold=8192,         # Content length threshold to trigger compression
-    compression_strategy='progressive_distillation', # 'progressive_distillation' or 'truncate'
-    max_compression_ratio=0.5,          # Prevents over-compression (e.g., 0.5 means compressed size won't be less than 50% of original)
-    compression_chunk_size=8192,        # Size of chunks for progressive distillation
-
-    # Stagnation Detection
-    stagnation_iterations=3,            # Can be overridden by -T, --stagnation_iterations CLI argument
-
-    # Human Approval
-    enable_human_approval: bool = False,        # Master switch for the optional human approval step
-
-    # System Prompt Management
-    enable_system_prompt_files: bool = False,   # If True, system prompts are read from files; otherwise, internal defaults are used.
-
-    # Mockup Generation
-    enable_mockup_generation: bool = False,     # If True, generates mockup data for debugging graph nodes.
-)
-```
 
 ## 🎛️ Quality Gate System
 
@@ -221,25 +269,27 @@ The system includes an intelligent quality gate that uses a rubric-based assessm
 
 ### Comprehensive Logging
 
-- **Refined Levels**: Logging messages are categorized into FATAL, ERROR, WARNING, INFO, and DEBUG levels for precise monitoring.
-- **Node Execution**: Detailed logs for each workflow step
-- **Timestamps**: All operations timestamped
-- **Input/Output Tracking**: Size and content logging
-- **Error Handling**: Detailed error reporting
+-   **Refined Levels**: Logging messages are categorized into FATAL, ERROR, WARNING, INFO, and DEBUG levels for precise monitoring.
+-   **Node Execution**: Detailed logs for each workflow step
+-   **Timestamps**: All operations timestamped
+-   **Input/Output Tracking**: Size and content logging
+-   **Error Handling**: Detailed error reporting
 
 ### Log Files
 
-Logs are saved to `logs/coop_llm_YYYYMMDD_HHMMSS.log`
+Logs are saved to `logs/coop_llm_YYYYMMDD_HHMMSS.log` (or `debug.log` for the `debug log` command).
 
-### Debug Information
+### Debugging with the CLI
 
-To enable debug-level logging, use the `-D` or `--debug` CLI flag when running `cli.py`:
+*   **Enable Debug Logging for `run` command:** Use the `--debug` flag with the `run` command to enable verbose debug logging. This is equivalent to `--log-level debug`.
+    ```bash
+    python src/cli.py run --debug -U prompts/my_feature.txt
+    ```
 
-```bash
-python cli.py -D ...
-```
-
-Alternatively, you can set the `log_level` in `config/settings.py` to `DEBUG`.
+*   **View Debug Log File:** Use the `debug log` command to display the content of the `debug.log` file (if it exists in the current working directory).
+    ```bash
+    python src/cli.py debug log
+    ```
 
 ## 📦 Deliverables
 
@@ -320,80 +370,61 @@ Once the Sandboxed Development phase produces code that is syntactically valid a
 
 ## 🔧 Extending the System
 
-### Adding New LLM Roles
+### Extensibility via Plugin System (Future Development)
 
-1. **Define LLM Config** in `config/settings.py`:
-   ```python
-   "new_role": LLMConfig(
-       name="New Role",
-       model_id="your-model:tag",
-       role="new_role"
-   )
-   ```
+The CLI is being designed with an extensibility via plugin system in mind. This will allow users to:
 
-2. **Add Prompt Template** in `utils/prompts.py`:
-   ```python
-   NEW_ROLE = """Your role-specific prompt template..."""
-   ```
+*   Implement and register custom workflow nodes.
+*   Integrate alternative LLM providers or models.
+*   Add new sub-commands to the CLI.
 
-3. **Create Node Function** in `workflow/graph_workflow.py`:
-   ```python
-   async def new_role_node(self, state: WorkflowState) -> WorkflowState:
-       # Implementation
-   ```
+For detailed design concepts and future plans regarding the plugin system, please refer to the `DEVELOPMENT_LOG.md`.
 
-4. **Update Graph** in `_build_graph()` method
-
-### Custom Quality Metrics
-
-Extend `workflow/quality_gate.py` to add custom quality assessments:
-
-```python
-def custom_quality_check(self, state: WorkflowState) -> float:
-    # Your custom quality logic
-    return quality_score
-```
 
 ## 🚨 Troubleshooting
 
 ### Common Issues
 
-1. **Model Not Available**
-   ```bash
-   ollama pull model-name:tag
-   ```
+1.  **Model Not Available**
+    *   If you encounter errors like `ERROR: LLM Model '<model_name>' required for <role> is not available...`, it means the required LLM is not available on your Ollama instance.
+    *   For the `--demo` mode, the `Fast_Lightweight` profile is used, which typically requires `gemma3:4b`, `deepseek-coder:6.7b`, and `neural-chat:latest`.
+    *   To make a model available, pull it using the Ollama CLI:
+        ```bash
+        ollama pull <model_name:tag>
+        # Example for demo models:
+        # ollama pull gemma3:4b
+        # ollama pull deepseek-coder:6.7b
+        # ollama pull neural-chat:latest
+        ```
+    *   You can list available models with `ollama list`.
 
-2. **Connection Error**
-   - Ensure Ollama is running: `ollama serve`
-   - Check host configuration in settings (or use `--url` CLI argument)
+2.  **Connection Error**
+    *   Ensure Ollama is running: `ollama serve`
+    *   Check your Ollama host configuration using `python src/cli.py config show` or specify it with `python src/cli.py run -O <ollama_host_url>`.
 
-3. **Memory Issues / Ollama Runner Crashes**
-   - This can manifest as `llama runner process has terminated` errors.
-   - Ensure your system has sufficient RAM for the models you are running.
-   - Try using smaller models (e.g., with the `low_reasoning` profile).
-   - Restart your Ollama server.
-   - Enable compression: `enable_compression=True` in `config/settings.py` (or via CLI).
-   - Reduce `compression_threshold` in `config/settings.py` (or via CLI).
-   - Use smaller models for non-critical roles.
+3.  **Memory Issues / Ollama Runner Crashes**
+    *   This can manifest as `llama runner process has terminated` errors.
+    *   Ensure your system has sufficient RAM for the models you are running.
+    *   Try using smaller models (e.g., with the `Low_Reasoning` profile: `python src/cli.py run -P Low_Reasoning ...`).
+    *   Restart your Ollama server.
+    *   Enable compression (if available in `SystemConfig`): `python src/cli.py config set enable_compression true`.
 
-4. **Graph Recursion Limit Managed Dynamically**
-   - This used to manifest as `GraphRecursionError: Recursion limit of X reached`.
-   - **Solution:** The `recursion_limit` is now dynamically managed by the system based on the `--max_iterations` CLI argument. This ensures that the internal graph recursion limit is automatically adjusted to accommodate longer workflows, reducing the likelihood of this error for typical use cases. If this error still occurs, consider if your workflow logic has unintended infinite loops or if `max_iterations` is set to an extremely high value. Analyze logs and deliverables to understand workflow progression.
+4.  **Graph Recursion Limit Managed Dynamically**
+    *   This used to manifest as `GraphRecursionError: Recursion limit of X reached`.
+    *   **Solution:** The `recursion_limit` is now dynamically managed by the system based on the `--max-iterations` CLI argument. This ensures that the internal graph recursion limit is automatically adjusted to accommodate longer workflows, reducing the likelihood of this error for typical use cases. If this error still occurs, consider if your workflow logic has unintended infinite loops or if `max_iterations` is set to an extremely high value. Analyze logs and deliverables to understand workflow progression.
 
-5. **Quality Gate LLM Not Returning Valid JSON**
-   - This can manifest as `LLM assessment is not valid JSON` warnings and the workflow getting stuck in a loop.
-   - **Cause:** The LLM assigned to the Quality Gate role is not consistently adhering to the strict JSON output format specified in its prompts.
-   - **Solution:**
-     - **Model Selection:** Ensure you are using a sufficiently capable LLM for the Quality Gate role (e.g., `gemma3:4b` or larger models are generally better at strict instruction following than `tinyllama`).
-     - **Prompt Review:** Carefully review `config/system_quality_gate_prompt.txt` and `config/quality_gate_prompt.txt` to ensure the instructions for JSON output are clear, unambiguous, and strongly emphasized.
-     - **Parsing Robustness:** The system includes robust parsing logic, with enhancements to sanitize JSON (e.g., replacing single quotes with double quotes, removing trailing commas) and a more flexible regex for extracting JSON from markdown blocks. However, consistent JSON output from the LLM is paramount for accurate assessment.
+5.  **Quality Gate LLM Not Returning Valid JSON**
+    *   This can manifest as `LLM assessment is not valid JSON` warnings and the workflow getting stuck in a loop.
+    *   **Cause:** The LLM assigned to the Quality Gate role is not consistently adhering to the strict JSON output format specified in its prompts.
+    *   **Solution:**
+        *   **Model Selection:** Ensure you are using a sufficiently capable LLM for the Quality Gate role (e.g., `gemma3:4b` or larger models are generally better at strict instruction following than `tinyllama`).
+        *   **Prompt Review:** Carefully review `config/system_quality_gate_prompt.txt` and `config/quality_gate_prompt.txt` to ensure the instructions for JSON output are clear, unambiguous, and strongly emphasized.
+        *   **Parsing Robustness:** The system includes robust parsing logic, with enhancements to sanitize JSON (e.g., replacing single quotes with double quotes, removing trailing commas) and a more flexible regex for extracting JSON from markdown blocks. However, consistent JSON output from the LLM is paramount for accurate assessment.
 
-### Performance Optimization
+### Enhanced CLI Messages
 
-- Use lightweight models for summarization
-- Enable message compression for long workflows
-- Adjust temperature settings for consistency vs creativity
-- Monitor iteration counts and quality thresholds
+*   **Startup Information**: The CLI now provides more detailed startup messages, including the selected LLM profile, its source (named, file, or default), the configured Ollama host, and the source of the user prompt.
+*   **Actionable Error Messages**: Error messages, especially for missing LLM models, are now more specific and include actionable advice on how to resolve the issue (e.g., `ollama pull <model_name>`).
 
 ## 📄 License
 
@@ -411,6 +442,6 @@ This project is open source and available under the MIT License.
 
 For issues and questions:
 - Check the logs in `logs/` directory
-- Review configuration in `config/settings.py`
+- Review configuration in `src/config/settings.py`
 - Run tests to verify functionality
 - Enable debug logging for detailed troubleshooting

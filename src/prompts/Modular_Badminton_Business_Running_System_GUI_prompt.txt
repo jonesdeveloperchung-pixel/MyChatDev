@@ -1,0 +1,497 @@
+### Please develop the frontend user interface for mobile devices, strictly adhering to the specifications outlined in the Front-End specification document. Ensure the design and functionality are optimized for a responsive experience across a range of mobile screen sizes.
+
+```Front‑End Specification
+# Front‑End Specification (UI/UX & Interaction Design)
+
+> **Goal** – Deliver a single, mobile‑first design specification that powers the modular badminton services.  
+> **Audience** – UI/UX designers, front‑end engineers, product owners, QA.  
+> **Scope** – Screens, components, navigation, state, accessibility, localisation, and data‑flow for every role (Admin, User, Referee, Technician, Shopkeeper).  
+> **Platform** – Native‑like mobile UI (React Native / Flutter) that can be adapted for iOS, Android, and progressive web.  
+> **Deliverable** – A living design spec that can be exported to Figma / Adobe XD and consumed by developers.
+
+---
+
+## 1. Design System & Tokens
+
+| Token | Value | Purpose |
+|-------|-------|---------|
+| **Color – Primary** | #1E3A8A | Brand identity |
+| **Color – Secondary** | #3B82F6 | Accents, button outline |
+| **Color – Success** | #10B981 | Positive actions, confirmations |
+| **Color – Error** | #EF4444 | Validation / error states |
+| **Color – Warning** | #F59E0B | Alerts, attention |
+| **Spacing** | 4 px increment (0 – 48 px) | Layout rhythm |
+| **Typography** | H1 = 24 px, H2 = 20 px, Body = 16 px | Readability |
+| **Elevation** | 0 – 4 dp | Shadows, modal depth |
+| **Motion** | 150 ms (e.g., button press) | Feedback speed |
+
+> *Design‑tokens are exported as JSON and consumed by the front‑end stack (e.g., `styled‑components`, `ThemeProvider`, `Flutter ThemeData`).*
+
+---
+
+## 2. Core UI Shell
+
+| Feature | Description |
+|---------|-------------|
+| **Bottom‑Bar Nav** | 5 tabs – Dashboard, Courts, Matches, Inventory, Analytics, Admin (Admin only). |
+| **Top Bar** | Context switcher (facility / role badge), search, notifications, user menu (profile → logout). |
+| **Right‑Side Drawer** | Quick‑action panel (reservation details, player cards, equipment status). |
+| **Theme Switch** | Light / dark + high‑contrast toggle (system‑wide). |
+
+---
+
+## 2.1 Navigation & Routing
+
+| Path | Screen | Deep‑Link |
+|------|--------|-----------|
+| `/dashboard` | Role‑specific overview | `myapp://dashboard` |
+| `/courts` | Calendar grid | `myapp://courts` |
+| `/courts/:courtId/availability` | Time‑slot view | `myapp://courts/5/availability` |
+| `/reservations/:id` | Reservation detail | `myapp://reservations/123` |
+| `/matches/:id/live` | Live scoreboard | `myapp://matches/45/live` |
+| `/inventory` | Product grid | `myapp://inventory` |
+| `/analytics` | Heat‑map dashboard | `myapp://analytics` |
+| `/admin` | User & role mgmt | `myapp://admin` |
+
+*Routes are protected by a role‑based guard that checks `role` stored in the local auth state.*
+
+---
+
+## 3. UI Components
+
+| Component | Props | Interaction | Backend Endpoints |
+|-----------|-------|-------------|--------------------|
+| **AuthForm** | `mode: 'login' | 'register'`<br>`onSubmit(payload)` | Validate, show toast on success, navigate to Dashboard | `/auth/login`, `/auth/register`, `/auth/me` |
+| **ProfileCard** | `user:{}`<br>`editable:boolean` | Inline editing, optimistic update, rollback | `/auth/me` |
+| **BottomNav** | `activeTab`<br>`onTabChange(tab)` | Smooth slide animation | N/A |
+| **TopBar** | `roleBadge`<br>`notificationsCount` | Click → Drawer open | `/health`, `/notifications` |
+| **SideDrawer** | `items:[]`<br>`onSelect(item)` | Swipe‑in/out, ARIA live region | `/reservations/:id`, `/matches/:id`, `/equipment/:id` |
+| **CourtGrid** | `courts:[]`<br>`selectedSlot` | Tap → Slot detail, price ribbon, waitlist badge | `/courts`, `/availability`, `/reservations` |
+| **ReservationForm** | `courtId`, `startTime`, `endTime`, `playerCount`, `skillLevel`, `notes` | Live validation via API, dynamic price | `/reservations` |
+| **ScoreBoard** | `match:{}`<br>`onScoreChange(payload)` | +1 / fault / let / undo / redo buttons, server indicator | `/matches/:id/score`, `/matches/:id/undo` |
+| **HeatMap** | `data:{}`<br>`onFilterChange(opts)` | Real‑time updates, export button | `/dashboard/court-heatmap` |
+| **InventoryCard** | `product:{}`<br>`onStockAdjust(payload)` | Stock badge, reorder indicator | `/products`, `/products/:id` |
+| **MaintenanceCalendar** | `schedule:[]` | Drag‑and‑drop, court blocking | `/maintenance` |
+
+*All API interactions are abstracted into a `useApi` hook that wraps `fetch` / `axios` and handles auth tokens.*
+
+---
+
+## 4. Navigation Flow per Role
+
+| Role | Primary Tab | Quick Actions (Drawer) | Permissions |
+|------|-------------|------------------------|-------------|
+| **Admin** | Admin | User mgmt, system health | Full CRUD |
+| **User** | Courts | My reservations, profile | Create / view own |
+| **Referee** | Matches | Live scoreboard, analytics | Full match view / scoring |
+| **Technician** | Inventory | Maintenance scheduler | Full maintenance |
+| **Shopkeeper** | Inventory | Reorder, PO | View / adjust stock |
+
+> **Note:** Permission checks happen client‑side via a `useAuth` hook that exposes `currentUser.role` and `isAuthorized(resource, action)`.
+
+---
+
+## 5. State & Data Flow
+
+```tsx
+// useAppStore (Zustand / Redux Toolkit)
+
+const useAppStore = create((set) => ({
+  auth: { token: null, user: null },
+  courts: { list: [], loading: false },
+  reservations: { list: [], loading: false },
+  matches: { live: null, history: [], loading: false },
+  inventory: { products: [], equipment: [], loading: false },
+  analytics: { heatMap: null, filters: {} },
+
+  fetchCourts: async () => {
+    set({ courts: { loading: true } })
+    const res = await api.get('/courts')
+    set({ courts: { list: res.data, loading: false } })
+  },
+
+  createReservation: async (payload) => {
+    set({ reservations: { loading: true } })
+    const res = await api.post('/reservations', payload)
+    set((state) => ({
+      reservations: { list: [...state.reservations.list, res.data], loading: false },
+    }))
+    // optimistic UI; rollback on 409 conflict
+  },
+
+  // ...other async actions
+}))
+```
+
+*The front‑end only consumes the exposed API routes; no database or service‑level logic is defined here.*
+
+---
+
+## 6. Accessibility & Keyboard Support
+
+| Feature | Design Note |
+|---------|-------------|
+| **WCAG 2.1 AA** | All color contrasts meet AA thresholds. |
+| **ARIA Live Regions** | Score changes, reservation status, and system alerts are announced automatically. |
+| **Keyboard‑First Scoring** | Referee scorepad can be operated via hardware or software keyboard shortcuts (`+1`, `fault`, `undo`, `redo`). |
+| **High‑Contrast Theme** | Toggled in Settings; all components expose a `highContrast` flag. |
+| **Reduced Motion** | Motion durations respect the system setting. |
+
+---
+
+## 7. Localization & Time‑Zone
+
+| Locale | Date Format | Time Format | Currency | Time‑Zone |
+|--------|-------------|-------------|----------|-----------|
+| Default (en) | DD MMM YYYY | 24 h | TWD | Asia/Taipei |
+| Other locales | Use i18n library (React‑Intl / Flutter‑intl) | Auto‑format | Currency symbol dynamic | `timezone` prop from `/auth/me` |
+
+*Locale strings are kept in a JSON i18n file; developers map each key to the UI text.*
+
+---
+
+## 8. Testing & QA Hooks
+
+| Hook | Purpose | Implementation |
+|------|---------|----------------|
+| **Skeleton Screens** | Indicate loading for lists / dashboards | `<SkeletonList/>` component |
+| **Empty States** | Role‑tailored guidance + CTA | `<EmptyState role={role} onCreate={...}/>` |
+| **API Mocking** | Sample data view in dev | Toggle `isMockEnabled` flag in store |
+| **Toast Service** | Success / error notifications | `<ToastProvider/>` with `enqueue(message, type)` |
+| **Unit Component Tests** | Verify props & accessibility | Jest + React‑Testing‑Library |
+
+---
+
+## 9. Component Specs (Selected)
+
+| Component | Props | Empty / Loading / Error | Accessibility |
+|-----------|-------|------------------------|----------------|
+| `CourtGrid` | `courts`, `selectedSlot`, `onSelect(slot)` | Skeleton grid | `role="grid"`; ARIA‑labels for availability |
+| `ReservationForm` | `courtId`, `startTime`, `endTime`, `playerCount`, `skillLevel`, `notes` | Disabled submit until valid | `role="form"`; live error region |
+| `ScoreBoard` | `match`, `onScore(payload)` | Loading match data | Keyboard navigation for +1 / fault / let |
+| `InventoryCard` | `product`, `onAdjustStock` | Empty stock message | `aria-badge` for low stock |
+
+---
+
+## 10. Deep Linking & URL Mapping
+
+| Deep‑Link | Screen | API Calls |
+|-----------|--------|-----------|
+| `myapp://courts` | Courts overview | `/courts` |
+| `myapp://courts/:courtId/availability` | Slot list | `/availability` |
+| `myapp://reservations/:id` | Reservation detail | `/reservations/:id` |
+| `myapp://matches/:id/live` | Live scoreboard | `/matches/:id/score` (WS) |
+| `myapp://analytics` | Heat‑map | `/dashboard/court-heatmap` |
+| `myapp://admin` | Admin console | `/users`, `/health/services` |
+
+> *Deep‑link resolution is handled client‑side. Unauthorized access routes trigger a redirect to the Login screen.*
+
+---
+
+## 11. Offline & Optimistic UI
+
+* **Scoring** – Events are queued in a local stack; WebSocket reconnection triggers a sync prompt.  
+* **Reservations** – Submit is optimistic; if a 409 conflict occurs, a rollback toast informs the user.  
+* **Inventory** – Stock adjustments are shown instantly; rollback on API error.  
+
+---
+
+## 12. Deliverables & Acceptance Criteria
+
+| Deliverable | Acceptance |
+|-------------|------------|
+| **High‑Fidelity Wireframes** | All key screens must be available in Figma with component libraries linked. |
+| **Component Spec Sheet** | Props, defaults, accessibility notes, empty / loading / error states. |
+| **API Mapping** | Per‑screen endpoint usage, request/response schemas, error handling strategy. |
+| **Role Play‑Tests** | Scripted end‑to‑end flows for each role, verifying permission gates. |
+| **Accessibility Test** | WCAG 2.1 AA audit score ≥ 80%. |
+| **Performance Benchmarks** | < 200 ms local interactions; < 1 s dashboard refresh; WS reconnection < 3 s. |
+
+---
+```
+
+### Please ensure that all frontend interfaces are seamlessly connected to the backend implementation, as detailed below.
+note. the backend had implemented, please focus on fronend only.
+
+```backend implementation
+# Modular Badminton Business Running System
+
+A comprehensive, microservices-based system for managing all aspects of a badminton business, from court reservations to equipment maintenance, with data-driven insights and real-time capabilities.
+
+## 🏗️ Architecture Overview
+
+The system follows a microservices architecture with the following components:
+
+### Core Services
+- **User Management Service** (Port 8000) - Authentication, authorization, user profiles
+- **Court Reservation Service** (Port 8001) - Booking logic, dynamic pricing, waitlist
+- **Match Scoring Service** (Port 8002) - Real-time scoring, player stats, match history
+- **Inventory & Maintenance Service** (Port 8003) - Product management, equipment tracking
+- **Analytics Service** (Port 8004) - Reports, visualizations, data export
+- **API Gateway** (Port 8080) - Single entry point, routing, authentication
+
+### Supporting Infrastructure
+- **PostgreSQL** - Primary database for all services
+- **Redis** - Caching and session storage
+- **Docker** - Containerization and orchestration
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Docker and Docker Compose
+- Python 3.11+ (for local development)
+- PostgreSQL (if running locally)
+
+### Using Docker (Recommended)
+
+1. **Clone and navigate to the project:**
+   ```bash
+   cd badminton_system
+   ```
+
+2. **Start all services:**
+   ```bash
+   docker-compose -f docker/docker-compose.yml up -d
+   ```
+
+3. **Check service health:**
+   ```bash
+   curl http://localhost:8080/health/services
+   ```
+
+4. **Access the API Gateway:**
+   - Main API: http://localhost:8080
+   - API Documentation: http://localhost:8080/docs
+
+### Local Development
+
+1. **Set up each service individually:**
+   ```bash
+   # User Service
+   cd user_service
+   pip install -r requirements.txt
+   uvicorn main:app --port 8000 --reload
+
+   # Court Reservation Service
+   cd ../court_reservation
+   pip install -r requirements.txt
+   uvicorn main:app --port 8001 --reload
+
+   # Continue for other services...
+   ```
+
+2. **Start the API Gateway:**
+   ```bash
+   cd api_gateway
+   pip install -r requirements.txt
+   uvicorn main:app --port 8080 --reload
+   ```
+
+## 📋 Features
+
+### ✅ Implemented Features
+
+#### User Management
+- [x] User registration and authentication (JWT)
+- [x] Role-based access control (admin, user, referee, technician, shopkeeper)
+- [x] User profile management
+- [x] Secure password hashing
+
+#### Court Reservation
+- [x] Court booking with availability checking
+- [x] Dynamic pricing (peak/off-peak hours)
+- [x] Waitlist management
+- [x] Reservation cancellation
+- [x] Multiple court types (standard, premium, VIP)
+
+#### Match Scoring
+- [x] Player profile creation
+- [x] Match setup (singles/doubles)
+- [x] Real-time score tracking
+- [x] Undo/redo functionality
+- [x] BWF rule validation
+- [x] WebSocket support for live updates
+- [x] Player statistics aggregation
+- [x] Match history export (JSON/CSV)
+
+#### Inventory & Maintenance
+- [x] Product catalog management
+- [x] Stock level monitoring
+- [x] Reorder alerts
+- [x] Equipment condition tracking
+- [x] Maintenance scheduling
+- [x] Predictive maintenance using wear models
+- [x] Technician assignment
+
+#### Analytics & Reporting
+- [x] Court utilization reports
+- [x] Player performance analytics
+- [x] Inventory turnover analysis
+- [x] Interactive dashboards
+- [x] Data visualization (charts, heatmaps)
+- [x] Data export capabilities
+
+#### System Infrastructure
+- [x] API Gateway with service routing
+- [x] Health monitoring
+- [x] Docker containerization
+- [x] Comprehensive logging
+- [x] Error handling
+- [x] CORS support
+
+## 🔧 API Endpoints
+
+### Authentication
+- `POST /auth/register` - Register new user
+- `POST /auth/login` - User login
+- `GET /auth/me` - Get current user profile
+
+### Court Management
+- `GET /courts` - List all courts
+- `POST /reservations` - Create reservation
+- `GET /reservations/{id}` - Get reservation details
+- `PUT /reservations/{id}/cancel` - Cancel reservation
+- `GET /availability` - Check court availability
+
+### Match Management
+- `POST /players` - Create player profile
+- `GET /players` - List all players
+- `POST /matches` - Create new match
+- `POST /matches/{id}/start` - Start match
+- `POST /matches/{id}/score` - Update score
+- `POST /matches/{id}/undo` - Undo last score
+
+### Inventory
+- `GET /products` - List products
+- `POST /products` - Add new product
+- `GET /equipment` - List equipment
+- `POST /maintenance` - Schedule maintenance
+- `GET /reports/reorder-alerts` - Get reorder alerts
+
+### Analytics
+- `POST /reports/court-utilization` - Court utilization report
+- `POST /reports/player-performance` - Player performance report
+- `GET /dashboard/court-heatmap` - Court usage heatmap
+- `GET /export/data` - Export data (JSON/CSV)
+
+### System
+- `GET /health` - Gateway health check
+- `GET /health/services` - All services health
+- `GET /system/info` - System information
+
+## 🏃‍♂️ Usage Examples
+
+### 1. Register a User
+```bash
+curl -X POST "http://localhost:8080/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "john_doe",
+    "email": "john@example.com",
+    "password": "securepass123",
+    "role": "user"
+  }'
+```
+
+### 2. Login and Get Token
+```bash
+curl -X POST "http://localhost:8080/auth/login" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=john_doe&password=securepass123"
+```
+
+### 3. Make a Court Reservation
+```bash
+curl -X POST "http://localhost:8080/reservations" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "court_id": 1,
+    "start_time": "2024-01-20T18:00:00",
+    "end_time": "2024-01-20T20:00:00",
+    "player_count": 2,
+    "skill_level": "intermediate"
+  }'
+```
+
+### 4. Create a Match
+```bash
+curl -X POST "http://localhost:8080/matches" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "match_type": "singles",
+    "player_ids": [1, 2],
+    "live_scoreboard": true
+  }'
+```
+
+### 5. Generate Court Utilization Report
+```bash
+curl -X POST "http://localhost:8080/reports/court-utilization?start_date=2024-01-01T00:00:00&end_date=2024-01-31T23:59:59&include_chart=true" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+## 🔒 Security Features
+
+- **JWT Authentication** - Secure token-based authentication
+- **Role-Based Access Control** - Different permissions for different user types
+- **Password Hashing** - Bcrypt for secure password storage
+- **Input Validation** - Pydantic models for request validation
+- **CORS Protection** - Configurable cross-origin resource sharing
+- **Rate Limiting** - Built into API Gateway (configurable)
+
+## 📊 Monitoring & Observability
+
+- **Health Checks** - All services expose health endpoints
+- **Structured Logging** - Comprehensive logging across all services
+- **Service Discovery** - API Gateway monitors service availability
+- **Error Tracking** - Centralized error handling and reporting
+
+## 🧪 Testing
+
+### Manual Testing
+Each service exposes interactive API documentation at `/docs`:
+- User Service: http://localhost:8000/docs
+- Court Service: http://localhost:8001/docs
+- Match Service: http://localhost:8002/docs
+- Inventory Service: http://localhost:8003/docs
+- Analytics Service: http://localhost:8004/docs
+- API Gateway: http://localhost:8080/docs
+
+### Sample Data
+Services automatically create sample data on startup for testing purposes.
+
+## 🔧 Configuration
+
+### Environment Variables
+Each service can be configured using environment variables:
+
+```bash
+# Database
+DATABASE_URL=postgresql+psycopg2://user:pass@host:port/db
+
+# JWT
+SECRET_KEY=your-secret-key
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Logging
+LOG_LEVEL=INFO
+
+# Service URLs (API Gateway)
+USER_SERVICE_URL=http://user_service:8000
+COURT_SERVICE_URL=http://court_service:8001
+# ... etc
+```
+
+## 🚀 Deployment
+
+### Production Deployment
+1. **Update environment variables** in `docker/docker-compose.yml`
+2. **Configure secrets management** (replace hardcoded secrets)
+3. **Set up reverse proxy** (nginx) for SSL termination
+4. **Configure monitoring** (Prometheus, Grafana)
+5. **Set up log aggregation** (ELK stack)
+
+```

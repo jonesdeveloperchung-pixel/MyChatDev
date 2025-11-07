@@ -1,0 +1,90 @@
+### 🦀 **Software Name:** PixelMirror
+
+### **Platform:** Android (via Rust + NDK) and PC (Windows/Linux via native Rust)
+
+### **Core Functionality:**  
+Real-time desktop mirroring from a PC to an Android device, implemented in Rust for high performance, memory safety, and zero-cost abstractions. Prioritizes low latency, robust error handling, and secure communication using Rust’s type system and concurrency model.
+
+---
+
+### **I. User Interface (UI) & User Experience (UX):**
+
+> UI layer may use Kotlin/Jetpack Compose on Android and GTK or egui on desktop. All backend logic, rendering, and networking are implemented in Rust.
+
+- **Main Screen:**
+  - **Mirroring Mode Toggle:** Triggers Rust backend to switch between framebuffer mirroring and basic display mode.
+  - **Resolution Selection:** UI dropdown updates resolution via Rust config struct and encoder module.
+  - **Latency Indicator:** Updated via Rust metrics using `std::time::Instant` and exposed through FFI or IPC.
+  - **Connection Status:** Rust socket layer reports IP and connection state to UI.
+  - **Settings Icon:** Opens configuration panel backed by Rust state management.
+
+- **Settings Panel:**
+  - **Network Type:** Rust detects interfaces using `get_if_addrs` or Android NDK bindings.
+  - **Static IP Configuration:** Rust applies IP settings via low-level socket APIs.
+  - **Latency Optimization:** Toggle updates encoder flags in Rust.
+  - **Audio Output Selection:** Rust enumerates audio devices via platform-specific crates (e.g., `cpal`, `ndk-sys`).
+  - **Color Calibration (Beta):** Optional integration with Rust FFI bindings to calibration libraries.
+
+- **Touchscreen Controls:**  
+  Android input events passed to Rust handlers for gesture interpretation and control packet generation.
+
+---
+
+### **II. Technical Specifications & Features (Rust Implementation Focus):**
+
+- **Remote Display Protocol:**  
+  Custom protocol implemented in Rust using `tokio`, `async-std`, or raw `std::net` sockets. Optionally wraps RDP or raw framebuffer streaming.
+
+- **Network Connection:**
+  - **Wi-Fi/Ethernet:** Interface detection and socket binding via Rust’s `net` and `nix` crates.
+
+- **Audio Streaming:**  
+  RTP implemented in Rust using `tokio::net::UdpSocket`. Bluetooth audio routed via Android NDK bindings or `ndk-sys`.
+
+- **Data Compression:**  
+  Lossy compression via Rust crates (e.g., `image`, `jpeg-decoder`, `zstd`). Aggressive mode toggles quantization and resolution.
+
+- **Latency Reduction:**  
+  Jitter buffer and packet loss compensation using Rust’s `VecDeque`, `crossbeam`, or `tokio::sync`.
+
+- **Error Handling:**  
+  Rust’s `Result` and `Option` types ensure graceful recovery and precise error propagation.
+
+- **Security:**  
+  TLS encryption via `rustls` or `ring`, applied to control and data channels.
+
+---
+
+### **III. Development & Future Enhancements (Rust Roadmap):**
+
+- **Technology Stack:**
+  - **Core:** Rust (edition 2021+), async I/O, FFI for Android
+  - **UI:** Kotlin (Android), GTK/egui (desktop)
+  - **Display Protocol:** Custom Rust protocol or RDP wrapper
+
+- **Future Features:**
+  - **Multi-Window Mirroring:** Rust session manager coordinates multiple streams
+  - **HDR Support:** Rust routines for HDR metadata parsing and tone mapping
+  - **Advanced Latency Optimization:** Implement DPMS and adaptive frame pacing in Rust
+  - **Customizable Keyboard Shortcuts:** Rust input mapping and serialization
+
+---
+
+### **IV. User Permissions (Android Manifest):**
+
+- Network Access (for Rust socket layer)
+- Microphone (for audio feedback via Rust audio capture)
+- Display Over Android (for rendering mirrored frames via Rust buffer)
+
+---
+
+### **Key Considerations for PixelMirror (Rust Implementation):**
+
+- ✅ **Low Latency is Paramount:**  
+  Rust’s zero-cost abstractions and async I/O deliver high performance with minimal overhead.
+
+- ✅ **Memory Safety Without Garbage Collection:**  
+  Rust eliminates crashes and leaks common in C/C++ implementations.
+
+- ✅ **Robust Error Handling:**  
+  Rust’s type system enforces explicit error paths and recovery strategies.

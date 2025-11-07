@@ -1,0 +1,34 @@
+
+# Default Runnable Profile: A balanced profile to ensure the program runs without issues.
+product_manager:
+  model_id: "gemma3:4b"
+  temperature: 0.3
+  max_tokens: 8192
+architect:
+  model_id: "gemma3:4b"
+  temperature: 0.2
+  max_tokens: 8192
+programmer:
+  model_id: "deepseek-coder:6.7b"
+  temperature: 0.1
+  max_tokens: 8192
+tester:
+  model_id: "gemma3:4b"
+  temperature: 0.2
+  max_tokens: 8192
+reviewer:
+  model_id: "gemma3:4b"
+  temperature: 0.3
+  max_tokens: 8192
+distiller:
+  model_id: "gemma3:1b"
+  temperature: 0.2
+  max_tokens: 4096
+reflector:
+  model_id: "gemma3:4b"
+  temperature: 0.2
+  max_tokens: 8192
+quality_gate:
+  model_id: "gemma3:4b"
+  temperature: 0.1
+  max_tokens: 8192

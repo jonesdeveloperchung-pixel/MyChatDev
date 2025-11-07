@@ -1,0 +1,14 @@
+**Design and implement a modular Wind Turbine Generator Development Calculation Software using Rust and Python, focused on user-defined target wattage inputs (e.g., 10W, 20W, 30W, 50W, 100W, etc.). The system must include:**
+
+1. **Interactive input interface** for specifying target output wattage, environmental conditions (e.g., average wind speed, air density), and design constraints (e.g., blade radius, number of blades, generator type).
+2. **Automated computation engine** that calculates all relevant design parameters, including:
+   - Required rotor swept area and blade length
+   - Optimal tip speed ratio (TSR) and coefficient of performance (Cp)
+   - Generator torque, RPM, and voltage output
+   - Gearbox ratio (if applicable), cut-in and rated wind speeds
+   - Estimated energy yield and efficiency under varying wind profiles
+3. **Modular solver architecture** with support for analytical and empirical models, including Betz limit validation, drag/lift coefficient estimation, and generator-load matching.
+4. **Telemetry-ready output layer** for exporting results in structured formats (e.g., JSON, CSV), with optional visualization of power curves, torque-speed characteristics, and energy yield simulations.
+5. **Onboarding-friendly documentation** with embedded design rationale, compliance notes (e.g., IEC standards), and reproducible calculation workflows for educational and prototyping use.
+
+The software must be self-contained, cross-platform, and production-ready, featuring integration tests, unit-tested calculation modules, and support for headless execution or GUI-based interaction. It should empower users to rapidly prototype wind turbine designs based on target wattage and environmental inputs, with traceable outputs and modular extensibility for future enhancements.

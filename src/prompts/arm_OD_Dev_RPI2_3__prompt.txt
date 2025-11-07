@@ -1,0 +1,9 @@
+Design and implement a bootable, modular Real-Time Operating System (RTOS) for Raspberry Pi 2 and 3 (ARMv7-A / ARMv8-A) using Rust, Assembly, and C, without relying on third-party components or external libraries. The system must include:
+
+1. Bare-metal initialization of the ARM CPU, MMU, and interrupt controller via a custom Assembly bootloader loaded by the Pi firmware (`bootcode.bin`, `start.elf`, and `config.txt`)
+2. Direct memory-mapped I/O access to onboard peripherals (e.g., GPIO, UART, USB, SD) with manual register configuration and interrupt-driven drivers
+3. A minimal GUI subsystem that initializes the framebuffer using the mailbox interface and displays a static string onscreen (e.g., "Welcome to Pi RTOS") using bitmap or raster font rendering
+4. A cooperative or preemptive task scheduler with configurable priorities and timing constraints, defined via flat configuration files or embedded tables
+5. Kernel-level logging and structured telemetry output via UART or framebuffer overlay, with optional SD card persistence using raw block writes
+
+The RTOS must be bootable from an SD card, include a minimal Assembly bootloader that transitions to a Rust-based kernel with C interop support, and support modular driver development for Raspberry Pi 2/3 hardware (e.g., BCM2836, BCM2837). The system should be self-contained and production-ready, featuring onboarding-friendly documentation, integration tests, and reproducible builds via cross-compilation and QEMU emulation.

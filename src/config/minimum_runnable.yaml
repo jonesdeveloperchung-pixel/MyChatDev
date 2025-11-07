@@ -1,0 +1,34 @@
+
+# Minimum Runnable Profile: The fastest possible profile for quick validation.
+product_manager:
+  model_id: "tinyllama:latest"
+  temperature: 0.3
+  max_tokens: 2048
+architect:
+  model_id: "tinyllama:latest"
+  temperature: 0.2
+  max_tokens: 2048
+programmer:
+  model_id: "deepseek-coder:1.3b"
+  temperature: 0.1
+  max_tokens: 4096
+tester:
+  model_id: "tinyllama:latest"
+  temperature: 0.2
+  max_tokens: 2048
+reviewer:
+  model_id: "tinyllama:latest"
+  temperature: 0.3
+  max_tokens: 2048
+distiller:
+  model_id: "tinyllama:latest"
+  temperature: 0.2
+  max_tokens: 2048
+reflector:
+  model_id: "tinyllama:latest"
+  temperature: 0.2
+  max_tokens: 2048
+quality_gate:
+  model_id: "tinyllama:latest"
+  temperature: 0.1
+  max_tokens: 2048

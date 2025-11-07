@@ -1,0 +1,34 @@
+
+# Performance Profile: A profile that balances performance and reasoning.
+product_manager:
+  model_id: "mistral:7b"
+  temperature: 0.3
+  max_tokens: 8192
+architect:
+  model_id: "phi4-mini-reasoning:3.8b"
+  temperature: 0.2
+  max_tokens: 8192
+programmer:
+  model_id: "qwen2.5-coder:latest"
+  temperature: 0.1
+  max_tokens: 8192
+tester:
+  model_id: "deepseek-coder:6.7b"
+  temperature: 0.2
+  max_tokens: 8192
+reviewer:
+  model_id: "mistral:7b"
+  temperature: 0.3
+  max_tokens: 8192
+distiller:
+  model_id: "gemma3:1b"
+  temperature: 0.2
+  max_tokens: 4096
+reflector:
+  model_id: "phi4-mini-reasoning:3.8b"
+  temperature: 0.2
+  max_tokens: 8192
+quality_gate:
+  model_id: "gemma3:4b"
+  temperature: 0.1
+  max_tokens: 8192

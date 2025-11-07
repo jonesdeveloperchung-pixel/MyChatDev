@@ -1,0 +1,102 @@
+## Overview
+
+> Build a **bootable, modular operating system** for the classic **x86** PC that:
+> 
+> * is written in **Rust** (kernel), **Assembly** (bootloader), and **C** (for interop)
+> * contains **no external libraries**—all code is in‑house
+> * can be built, tested, and run in QEMU/Bochs without any special host software
+
+---
+
+## High‑Level Goals
+
+| # | Goal | Why it matters |
+|---|------|----------------|
+| 1 | **BIOS‑based bootloader** that loads the kernel from disk | Enables the OS to start on real hardware and in emulators |
+| 2 | **Rust kernel** with C interop | Combines safety (Rust) with low‑level flexibility (C) |
+| 3 | **Hardware discovery** at boot | Gives the kernel knowledge of USB, PS/2, ATA, etc. |
+| 4 | **Configurable scheduling & rate‑limiting** | Demonstrates OS‑level control over resources |
+| 5 | **Persistent telemetry & logs** on raw disk | Shows journaling and diagnostics without external DBs |
+| 6 | **Robust error handling** throughout | Critical for a production‑ready OS |
+| 7 | **Minimal GUI** that renders a “Welcome” string | Provides a tangible user interface |
+| 8 | **Automated, reproducible builds** | Guarantees that builds are repeatable across machines |
+| 9 | **Documentation & tests** | Makes onboarding and future maintenance painless |
+
+---
+
+## Feature Checklist
+
+### 1. Bootloader (Assembly)
+
+1. **MBR layout** – boot sector occupies the first 512 bytes.  
+2. **Switch to protected mode** – set up GDT, IDT, enable PAE if desired.  
+3. **Load the kernel** – read the next N sectors from disk into memory, verify checksum.  
+4. **Pass control** – jump to the Rust kernel entry point with a known stack.
+
+### 2. Rust Kernel (with C interop)
+
+| Sub‑component | Task |
+|---------------|------|
+| **Entry point** | A small Rust `main` that receives the stack pointer and initializes the C runtime. |
+| **C shim** | Provide `extern "C"` functions for assembly ↔ Rust calls. |
+| **Subsystems** | Scheduler, device drivers, telemetry, error logger, GUI. |
+
+### 3. Hardware Probing
+
+1. **USB** – enumerate ports via I/O ports or UEFI Runtime Services.  
+2. **PS/2** – read controller status and device IDs.  
+3. **ATA** – issue IDENTIFY commands, read disk geometry.  
+4. **Metadata extraction** – store device descriptors in a Rust `HashMap` (or a custom small map).  
+
+### 4. Scheduler & Rate Limiting
+
+1. **Task table** – lightweight struct for each runnable.  
+2. **Round‑robin / priority queue** – basic CPU sharing.  
+3. **Rate limiter** – token bucket per task, configurable from a flat‑file (`config.toml`‑style).  
+4. **Access control** – simple UID/GID or capability tokens for I/O operations.  
+
+### 5. Telemetry & Logging
+
+1. **Journaling format** – fixed‑size records with sequence numbers, checksum.  
+2. **Raw disk writes** – use a dedicated sector range (e.g., last 1 MiB).  
+3. **Flush policy** – log sync on critical events, async otherwise.  
+4. **No DB** – just append and read sequentially.  
+
+### 6. Error Handling
+
+1. **Rust `Result<T, E>`** everywhere.  
+2. **panic handler** – log to disk, halt.  
+3. **Kernel‑level logger** – exposes `klog::error!`, `klog::info!`.  
+4. **Cross‑module consistency** – all subsystems use the same log API.
+
+### 7. Minimal GUI
+
+1. **VGA or framebuffer mode** – 80×25 ASCII or 640×480 8‑bit palette.  
+2. **String renderer** – hard‑coded font table, blit "Welcome to x86 OS".  
+3. **Display hook** – called once after the graphics mode is set.  
+
+### 8. Build & Emulation
+
+1. **Cross‑compile** – `x86_64-unknown-none` target.  
+2. **Build system** – `cargo` + `build.rs` + `nasm`.  
+3. **Reproducible builds** – embed build hash in kernel ELF, checksum the MBR image.  
+4. **Testing** – unit tests in Rust, integration tests via QEMU with `-nographic`.  
+5. **Automation** – CI pipeline that runs on every commit (GitHub Actions / GitLab CI).  
+
+### 9. Documentation & Onboarding
+
+1. **README** – project scope, build steps, run instructions.  
+2. **Architecture diagram** – bootloader → kernel → subsystems.  
+3. **Code comments** – high‑level explanation in each module.  
+4. **Tutorial** – “Add a new device driver” walkthrough.  
+5. **Contribution guide** – linting, formatting, code style.
+
+---
+
+## How to Use This Checklist
+
+- **Sprint 1**: Implement bootloader, basic Rust entry, and a hello‑world kernel.  
+- **Sprint 2**: Add hardware probing and a simple logger.  
+- **Sprint 3**: Build scheduler and rate limiter.  
+- **Sprint 4**: Implement telemetry journaling.  
+- **Sprint 5**: Finish GUI and wrap up tests/build pipeline.  

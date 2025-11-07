@@ -1,0 +1,94 @@
+### **Software Name:** PixelMirror
+
+### **Platform:** Android (Targeting Android 13+ via NDK for optimal performance and hardware access)
+
+### **Core Functionality:**  
+Real-time desktop mirroring from a PC to an Android device, implemented in C for maximum control over memory, threading, and latency-critical operations.
+
+---
+
+### **I. User Interface (UI) & User Experience (UX):**
+
+> While the UI layer may use Java/Kotlin for Android integration, all performance-critical logic (e.g., rendering, network handling, compression) is implemented in C via JNI bindings.
+
+- **Main Screen (UI calls into C backend):**
+  - **Mirroring Mode Toggle:** Triggers native C function to switch framebuffer source and rendering mode.
+  - **Resolution Selection:** Dropdown invokes C routine to reconfigure framebuffer scaling and encoding parameters.
+  - **Latency Indicator:** Updated via C-based timing metrics (e.g., `clock_gettime`, `gettimeofday`) exposed to UI.
+  - **Connection Status:** C socket layer reports IP and connection state to UI via JNI.
+  - **Settings Icon:** Opens configuration panel (UI-driven, backed by C structs for config state).
+
+- **Settings Panel:**
+  - **Network Type:** C-based detection of available interfaces using `ioctl` and `getifaddrs`.
+  - **Static IP Configuration:** C routines apply IP settings via low-level socket APIs.
+  - **Latency Optimization:** Toggles compression flags in C encoder module.
+  - **Audio Output Selection:** C backend selects and routes audio streams using Android NDK audio APIs.
+  - **Color Calibration (Beta):** Optional integration with C-based calibration libraries (e.g., LittleCMS).
+
+- **Touchscreen Controls:**  
+  Input events from Android are passed to C handlers for gesture interpretation and PC control packet generation.
+
+---
+
+### **II. Technical Specifications & Features (C Implementation Focus):**
+
+- **Remote Display Protocol:**  
+  Custom C-based protocol over TCP/UDP, optionally wrapping RDP or raw framebuffer data. Uses `select`, `poll`, or `epoll` for socket multiplexing.
+
+- **Network Connection:**
+  - **Wi-Fi:** C code uses Android NDK's `libwifi-hal` or raw socket scanning.
+  - **Ethernet:** Direct socket communication via C, with interface enumeration using `ioctl`.
+
+- **Audio Streaming:**  
+  RTP implemented in C using raw UDP sockets. Bluetooth audio routed via Android NDK's `AAudio` or `OpenSL ES`.
+
+- **Data Compression:**  
+  Lossy compression via C libraries (e.g., libjpeg-turbo, libzstd). Aggressive mode toggles quantization and downsampling.
+
+- **Latency Reduction:**  
+  C-based jitter buffer and packet loss compensation using circular buffers and adaptive retransmission.
+
+- **Error Handling:**  
+  All socket, memory, and thread operations wrapped with robust error checks (`errno`, `strerror`, custom logging macros).
+
+- **Security:**  
+  Lightweight encryption via C libraries (e.g., libsodium or OpenSSL), applied to control and data channels.
+
+---
+
+### **III. Development & Future Enhancements (C-centric Roadmap):**
+
+- **Technology Stack:**
+  - **Core:** C (NDK), POSIX threads, raw sockets, framebuffer encoding
+  - **Android Integration:** JNI bridge to Kotlin UI
+  - **Display Protocol:** Custom C protocol or RDP client/server in C
+
+- **UI Framework:**  
+  Jetpack Compose (UI only), with C backend exposed via JNI
+
+- **Future Features:**
+  - **Multi-Window Mirroring:** C-based window capture and multiplexing
+  - **HDR Support:** C routines for HDR metadata parsing and tone mapping
+  - **Advanced Latency Optimization:** Implement DPMS and adaptive frame pacing in C
+  - **Customizable Keyboard Shortcuts:** C-based input mapping and serialization
+
+---
+
+### **IV. User Permissions (Android Manifest):**
+
+- Network Access (for C socket layer)
+- Microphone (for audio feedback via C audio capture)
+- Display Over Android (for rendering mirrored frames via C buffer)
+
+---
+
+### **Key Considerations for PixelMirror (C Implementation):**
+
+- **Low Latency is Paramount:**  
+  C enables fine-grained control over memory, threads, and I/O for minimal latency.
+
+- **User-Friendly Design:**  
+  UI remains intuitive, but all backend logic is optimized in C for performance.
+
+- **Robust Error Handling:**  
+  C modules include detailed logging, fallback routines, and recovery mechanisms.

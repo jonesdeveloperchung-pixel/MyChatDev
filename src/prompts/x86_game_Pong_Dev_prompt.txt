@@ -1,0 +1,86 @@
+**Design and implement a bootable, bare‑metal Pong game for x86 architecture, without relying on any operating system, third‑party components, or external libraries. Programming languages are unrestricted (Assembly, C, Rust, or others may be used). The system must include:**
+
+1. **Custom bootloader** written in Assembly, loaded via BIOS MBR, which sets up protected mode, initializes segment registers, and transfers control to the game kernel.  
+2. **Direct hardware initialization** of VGA or framebuffer graphics mode using BIOS interrupts or manual register programming, with no OS or driver dependencies.  
+3. **Minimal graphics subsystem** capable of drawing:  
+   - A static background (solid color or simple bitmap)  
+   - Rectangular paddles and a moving ball  
+   - A centered string (e.g., “PONG”) at startup splash screen  
+4. **Input handling** via direct polling of PS/2 keyboard or USB (if implemented), mapping keys to paddle movement.  
+5. **Game loop** implemented as a cooperative scheduler:  
+   - Ball movement and collision detection with paddles and screen edges  
+   - Score tracking and onscreen rendering of numeric values  
+   - Frame timing controlled via PIT (Programmable Interval Timer) or CPU cycle delays for consistent gameplay speed  
+6. **Lightweight diagnostics/logging** optionally routed to serial port or onscreen overlay for debugging, compiled conditionally.  
+7. **Build system** supporting reproducible cross‑compilation, with QEMU/Bochs emulation targets and optional ISO image generation for bootable media.  
+
+**The Pong system must be self‑contained, bootable directly from BIOS, and under 64KB total binary size. Documentation should include onboarding notes, annotated source, and reproducible build instructions for contributors.**
+
+# 🕹️ Bare‑Metal Pong: Role–Phase Breakdown
+
+## 1. **Bootloader Phase (Assembly Lead)**
+**Role:** Low‑level systems engineer  
+**Responsibilities:**
+- Write a custom MBR boot sector in Assembly (≤512 bytes).  
+- Switch CPU from real mode → protected mode.  
+- Set up GDT (Global Descriptor Table) and basic stack.  
+- Load the game kernel (written in C/Rust/Assembly mix) into memory.  
+- Pass control cleanly to kernel entry point.  
+
+**Deliverables:**
+- `boot.asm` with annotated source.  
+- Verified boot into protected mode under QEMU/Bochs.  
+- Handoff contract: kernel entry address + stack pointer.  
+
+---
+
+## 2. **Graphics Init Phase (Graphics/Framebuffer Engineer)**
+**Role:** Graphics subsystem developer  
+**Responsibilities:**
+- Initialize VGA mode 13h (320×200, 256 colors) or linear framebuffer.  
+- Provide primitive drawing routines:  
+  - Clear screen (fill background).  
+  - Draw rectangle (paddles).  
+  - Draw circle or square (ball).  
+  - Render fixed‑width bitmap font for text (scores, “PONG” splash).  
+
+**Deliverables:**
+- `gfx.c` or `gfx.rs` with minimal API: `clear()`, `draw_rect()`, `draw_ball()`, `draw_text()`.  
+- Centered splash string “PONG” at startup.  
+- Verified rendering under QEMU.  
+
+---
+
+## 3. **Input Phase (Input/Device Engineer)**
+**Role:** Input handler developer  
+**Responsibilities:**
+- Poll PS/2 keyboard controller directly via I/O ports (0x60, 0x64).  
+- Map keys to paddle movement (e.g., W/S for left, ↑/↓ for right).  
+- Debounce and buffer keystrokes for smooth gameplay.  
+
+**Deliverables:**
+- `input.c` or `input.rs` with `get_key_state()` API.  
+- Integration test: paddles move onscreen when keys pressed.  
+
+---
+
+## 4. **Game Loop Phase (Gameplay/Logic Engineer)**
+**Role:** Game logic developer  
+**Responsibilities:**
+- Implement main loop with frame timing (PIT or cycle delay).  
+- Update ball position, detect collisions with paddles and walls.  
+- Update scores and redraw screen each frame.  
+- Handle win condition (e.g., first to 5 points).  
+
+**Deliverables:**
+- `game.c` or `game.rs` with `main_loop()`.  
+- Verified gameplay: ball bounces, paddles move, scores increment.  
+- Optional: debug overlay via serial output.  
+
+---
+
+# 🔄 Integration & Traceability
+- **Bootloader → Kernel handoff**: entry point + stack pointer.  
+- **Graphics API** consumed by Game Loop.  
+- **Input API** consumed by Game Loop.  
+- **Game Loop** drives redraw + input polling + collision detection.  

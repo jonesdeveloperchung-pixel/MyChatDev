@@ -1,0 +1,90 @@
+### 🐍 **Software Name:** PixelMirror
+
+### **Platform:** Android (via Chaquopy, BeeWare, or Kivy) and PC (Windows/Linux using Python 3.11+)
+
+### **Core Functionality:**  
+Real-time desktop mirroring from a PC to an Android device, implemented in Python for fast development, readable code, and rich ecosystem support. Prioritizes low latency and stable performance using Python’s socket programming, threading, and image processing libraries.
+
+---
+
+### **I. User Interface (UI) & User Experience (UX):**
+
+> UI logic written in Python using Kivy (cross-platform), PyQt (desktop), or integrated with Android via Chaquopy or BeeWare. Backend services and control flow are Python-native.
+
+- **Main Screen:**
+  - **Mirroring Mode Toggle:** Python `Button` triggers switch between framebuffer mirroring and basic display mode.
+  - **Resolution Selection:** Python `Dropdown` updates encoder settings via config dictionary.
+  - **Latency Indicator:** Python `ProgressBar` updated by a `threading.Timer` or `asyncio` coroutine.
+  - **Connection Status:** Python `Label` displays connection state and IP, updated via socket events.
+  - **Settings Icon:** Opens a modal or navigates to a settings screen.
+
+- **Settings Panel:**
+  - **Network Type:** Python `RadioButton` group updates network mode.
+  - **Static IP Configuration:** Python input validated and applied via `socket` and `netifaces`.
+  - **Latency Optimization:** Python toggle updates compression flags in encoder module.
+  - **Audio Output Selection:** Python dropdown populated from `sounddevice` or platform-specific audio APIs.
+  - **Color Calibration (Beta):** Optional integration with Python libraries like `colormath` or OpenCV.
+
+- **Touchscreen Controls:**  
+  Python gesture handlers (`on_touch_down`, `on_touch_move`) translate input into control packets for PC.
+
+---
+
+### **II. Technical Specifications & Features (Python Implementation Focus):**
+
+- **Remote Display Protocol:**  
+  Custom protocol implemented in Python using `socket`, `selectors`, and `struct`. Optionally wraps RDP or raw bitmap streaming.
+
+- **Network Connection:**
+  - **Wi-Fi/Ethernet:** Interface detection and socket binding via `netifaces`, `psutil`, or `socket`.
+
+- **Audio Streaming:**  
+  RTP implemented in Python using `socket` and `pyaudio`. Bluetooth audio routed via Android APIs or platform-specific bindings.
+
+- **Data Compression:**  
+  Lossy compression via Python libraries (`Pillow`, `OpenCV`, `zlib`). Aggressive mode toggles resolution and JPEG quality.
+
+- **Latency Reduction:**  
+  Jitter buffer and packet loss compensation using `collections.deque`, `asyncio.Queue`, or `threading`.
+
+- **Error Handling:**  
+  Python `try/except` blocks with logging via `logging` module and recovery logic using watchdog timers.
+
+- **Security:**  
+  TLS encryption via `ssl`, `cryptography`, or `PyNaCl`.
+
+---
+
+### **III. Development & Future Enhancements (Python Roadmap):**
+
+- **Technology Stack:**
+  - **Core:** Python 3.11+, `asyncio`, `socket`, `Pillow`, `OpenCV`
+  - **UI:** Kivy (cross-platform), PyQt (desktop), Chaquopy/BeeWare (Android)
+  - **Display Protocol:** Custom Python protocol or RDP wrapper
+
+- **Future Features:**
+  - **Multi-Window Mirroring:** Python session manager coordinates multiple streams
+  - **HDR Support:** Python routines for HDR metadata parsing and tone mapping
+  - **Advanced Latency Optimization:** Implement DPMS and adaptive frame pacing in Python
+  - **Customizable Keyboard Shortcuts:** Python config maps input to PC control packets
+
+---
+
+### **IV. User Permissions (Android Manifest via Python integration):**
+
+- Network Access (for Python socket communication)
+- Microphone (for audio feedback)
+- Display Over Android (for rendering mirrored frames)
+
+---
+
+### **Key Considerations for PixelMirror (Python Implementation):**
+
+- ⚡ **Low Latency is Paramount:**  
+  Python’s async I/O and modular design allow rapid iteration and tuning.
+
+- 🧠 **Readable and Maintainable:**  
+  Python’s syntax and ecosystem make it ideal for onboarding contributors.
+
+- 🛠️ **Robust Error Handling:**  
+  Python’s exception model and logging tools provide resilience and traceability.

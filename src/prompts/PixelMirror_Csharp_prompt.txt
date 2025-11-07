@@ -1,0 +1,91 @@
+### **Software Name:** PixelMirror
+
+### **Platform:** Android (Targeting Android 13+ via .NET MAUI or Xamarin.Android)
+
+### **Core Functionality:**  
+Real-time desktop mirroring from a PC to an Android device, implemented in C# for rapid development, strong type safety, and cross-platform maintainability. Prioritizes low latency and reliable performance through efficient threading and socket communication.
+
+---
+
+### **I. User Interface (UI) & User Experience (UX):**
+
+> UI built using .NET MAUI or Xamarin.Forms for Android, with C# backend logic and MVVM architecture.
+
+- **Main Screen:**
+  - **Mirroring Mode Toggle:** Bound to a C# command that switches between display modes using dependency-injected services.
+  - **Resolution Selection:** ComboBox bound to a ViewModel property; triggers resolution change via C# display manager.
+  - **Latency Indicator:** Real-time latency visualized using a progress bar updated by a C# timer and network metrics.
+  - **Connection Status:** Text label bound to connection state property; updated via C# socket events.
+  - **Settings Icon:** Opens a modal or navigation page for configuration.
+
+- **Settings Panel:**
+  - **Network Type:** Radio buttons bound to enum values in C# ViewModel.
+  - **Static IP Configuration:** Text input validated and applied via C# network configuration service.
+  - **Latency Optimization:** Toggle switch bound to compression settings in C# encoder module.
+  - **Audio Output Selection:** Dropdown populated from C# audio device enumeration.
+  - **Color Calibration (Beta):** Optional integration with C# calibration libraries (e.g., ColorMine or custom matrix transforms).
+
+- **Touchscreen Controls:**  
+  Gesture recognizers in C# translate touch input into control packets for PC interaction.
+
+---
+
+### **II. Technical Specifications & Features (C# Implementation Focus):**
+
+- **Remote Display Protocol:**  
+  Custom protocol implemented in C# using `TcpClient`, `UdpClient`, and `SocketAsyncEventArgs`. Optionally wraps RDP or raw bitmap streaming.
+
+- **Network Connection:**
+  - **Wi-Fi:** Uses Android APIs via Xamarin bindings or .NET MAUI Essentials.
+  - **Ethernet:** Interface detection and socket binding via C# network utilities.
+
+- **Audio Streaming:**  
+  RTP implemented in C# using `UdpClient`. Bluetooth audio routed via Android bindings or platform-specific services.
+
+- **Data Compression:**  
+  Lossy compression via C# libraries (e.g., System.Drawing, SkiaSharp, or custom DCT-based encoder).
+
+- **Latency Reduction:**  
+  Jitter buffer and packet loss compensation implemented using C# circular buffers and async queues.
+
+- **Error Handling:**  
+  Try-catch blocks, logging via `ILogger`, and retry logic using Polly or custom resilience patterns.
+
+- **Security:**  
+  TLS encryption via `SslStream` or integration with BouncyCastle for lightweight cryptography.
+
+---
+
+### **III. Development & Future Enhancements (C# Roadmap):**
+
+- **Technology Stack:**
+  - **Core:** C# (.NET 8), async/await, TCP/UDP sockets
+  - **UI:** .NET MAUI or Xamarin.Forms
+  - **Display Protocol:** Custom C# protocol or RDP client wrapper
+
+- **Future Features:**
+  - **Multi-Window Mirroring:** C# window capture and multiplexing
+  - **HDR Support:** C# routines for HDR metadata parsing and rendering
+  - **Advanced Latency Optimization:** Implement DPMS and adaptive frame pacing in C#
+  - **Customizable Keyboard Shortcuts:** C# input mapping and serialization
+
+---
+
+### **IV. User Permissions (Android Manifest via Xamarin or MAUI):**
+
+- Network Access (for socket communication)
+- Microphone (for audio feedback)
+- Display Over Android (for rendering mirrored frames)
+
+---
+
+### **Key Considerations for PixelMirror (C# Implementation):**
+
+- **Low Latency is Paramount:**  
+  C# async I/O and efficient memory management ensure minimal latency.
+
+- **User-Friendly Design:**  
+  MVVM architecture and data binding make the UI responsive and intuitive.
+
+- **Robust Error Handling:**  
+  C# exception handling and logging frameworks provide resilience and traceability.

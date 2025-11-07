@@ -1,0 +1,3668 @@
+I would like you to thoroughly review the code provided below. Your task is to consolidate the code into a single, cohesive package. Following the review, please generate a comprehensive design specification that outlines the architecture, key components, and dependencies of this consolidated package. Please detail the rationale behind your design choices. I’m looking for a robust and well-documented design.
+
+````
+> **Purpose** – Bring all the ad‑hoc scripts you have into a single, maintainable, testable, and distributable Python package.  
+> **Audience** – Future maintainers, CI/CD engineers, and any other developer that may want to import the library or run the bundled CLIs.  
+
+---------------------------------------------------------------------
+
+## 1.  Vision & Goals  
+
+| Goal | Description |
+|------|-------------|
+| **Modularity** | Separate *domain logic* (`core/`) from *command‑line glue* (`cli/`). |
+| **Re‑usability** | Expose all helpers as importable functions / classes. |
+| **Testability** | Each module must have deterministic, pure‑function style code that can be unit‑tested. |
+| **Maintainability** | Use type hints, PEP‑8 imports, consistent logging. |
+| **Distribution** | Build‑ready with `pyproject.toml`, installable with Poetry / pip‑env, script entry points. |
+| **Extensibility** | Easy to add new file‑type deduplication, new CLI wrappers, or new output formats. |
+
+---------------------------------------------------------------------
+
+## 2.  High‑Level Architecture  
+
+```
+┌───────────────────────────────────────┐
+│              myutils package           │
+│  ┌─────────────────────────────────────┐│
+│  │          core/ (domain logic)       ││
+│  │  ├─ duplicate.py                    ││
+│  │  ├─ image.py                        ││
+│  │  ├─ source.py                       ││
+│  │  ├─ ebook.py                        ││
+│  │  ├─ chat.py                         ││
+│  │  ├─ system.py                       ││
+│  │  ├─ file_utils.py                   ││
+│  │  └─ logger.py                       ││
+│  ├─────────────────────────────────────┤│
+│  │          cli/ (thin wrappers)       ││
+│  │  ├─ duplicate_cli.py                ││
+│  │  ├─ image_cli.py                    ││
+│  │  ├─ source_cli.py                   ││
+│  │  ├─ ebook_cli.py                    ││
+│  │  ├─ chat_cli.py                     ││
+│  │  ├─ system_cli.py                   ││
+│  │  └─ file_tree_cli.py                ││
+│  ├─────────────────────────────────────┤│
+│  │          tests/ (unit tests)        ││
+│  ├─────────────────────────────────────┤│
+│  │          pyproject.toml             ││
+│  └─────────────────────────────────────┘│
+└───────────────────────────────────────┘
+```
+
+* **core/** – pure business logic.  
+* **cli/** – minimal `argparse` / `click` wrappers that import from `core`.  
+* **tests/** – unit‑test skeletons, can be expanded later.  
+* **pyproject.toml** – build metadata + entry points.
+
+```ArchiveOrgDownloader.py
+#!/usr/bin/python
+from bs4 import BeautifulSoup
+import time
+import requests
+import re
+import os
+import subprocess
+DOS_GAME_URL = 'https://dos.zczc.cz'
+KEY = '?'
+def get_gamelist(dom, date):
+    soup = BeautifulSoup(dom, 'html.parser')
+    print(soup)
+    gamelist = []
+    lis = soup.find_all('li')
+    for l in lis:
+        if l.find('a'):  # 有超連結，表示文章存在，未被刪除
+            href = l.find('a')['href']
+            title = l.find('a').text
+            #print(href)
+            gamelist.append({
+                'name': title,
+                'url': DOS_GAME_URL + href
+            })
+    return gamelist
+
+def get_web_page(url):
+    resp = requests.get(
+        url=url,
+        cookies={'over18': '1'}
+    )
+    if resp.status_code != 200:
+        print('Invalid url:', resp.url)
+        return None
+    else:
+        return resp.text
+
+def get_downloadable_address(dom):
+    soup = BeautifulSoup(dom, 'html.parser')
+    #print(soup)
+    game_href = soup.find_all(text=re.compile('const game_url='))
+    game_url = str(game_href)
+    url = game_url.split('"')[1]
+    #print(url)
+    return url
+def slugify(value):
+    """
+    Normalizes string, converts to lowercase, removes non-alpha characters,
+    and converts spaces to hyphens.
+    """
+    import unicodedata
+    value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore')
+    value = str(re.sub('[^\w\s-]', '', value).strip().lower())
+    value = str(re.sub('[-\s]+', '-', value))
+def filify(string):
+    for c in string:
+        if c.isalnum() or c in [' ','.','/']:
+            string = string + c
+    return string
+page = get_web_page(DOS_GAME_URL + '/games/')
+if page:
+    date = time.strftime("%m/%d").lstrip('0')
+    current_gamelist = get_gamelist(page, date)
+    for game in current_gamelist:
+        link = get_downloadable_address(get_web_page(game['url']))
+        filename = link.split('/')[5]
+        print("the file is " + filename)
+        if os.path.exists(filename):
+            print(filename + " downloaded!")
+        else:
+            #myfile = requests.get(link, allow_redirects=True)
+            #slugify(game['name'])
+            #open(game['name'],'wb').write(myfile.content)
+            subprocess.call(["wget", link])
+            #print("downloading")
+
+        #print(get_web_page(game['url']))
+```
+```autoCompressZipFileByName.py
+#!/usr/bin/python
+# import required modules
+import os
+import sys
+import zipfile
+# Declare the function to return all file paths of a particular directory
+def retrieve_file_paths(dirName):
+  # setup file paths variable
+  filePaths = []
+  # Read all directory, subdirectories and file lists
+  for root, directories, files in os.walk(dirName):
+    for filename in files:
+      # Create the full filepath by using os module.
+      filePath = os.path.join(root, filename)
+      filePaths.append(filePath)
+  # return all paths
+  return filePaths
+
+# Declare the main function
+def main():
+  # Check two arguments are given at the time of running the script
+  if len (sys.argv) != 2 :
+    print ("Local directory will be use as default folder.")
+    dir_name = "."
+  # Set the directory name from command argument
+  dir_name = sys.argv[1]
+  # Set the zip file name
+  #zipFileName = dir_name + ".zip"
+  # Call the function to retrieve all files and folders of the assigned directory
+  filePaths = retrieve_file_paths(dir_name)
+  # print the list of files to be zipped
+  print('Processing the directory "'+ dir_name + '" :')
+  for fileName in filePaths:
+    root, ext = os.path.splitext(fileName)
+    zipFileName = root + ".zip"
+    print('Zipped file "' + fileName + '"')
+    zip_file = zipfile.ZipFile(zipFileName, 'w')
+    zip_file.write(fileName, compress_type=zipfile.ZIP_DEFLATED)
+  # write files and folders to a zipfile
+  #zip_file = zipfile.ZipFile(zipFileName, 'w')
+  #with zip_file:
+    # write each file seperately
+    #for file in filePaths:
+      #zip_file.write(file)
+  #print(zipFileName+' file is created successfully!')
+# Call the main function
+if __name__ == "__main__":
+  main()
+```
+```base64_encode.py
+python import base64
+image = open('deer.gif', 'rb')
+image_read = image.read()
+image_64_encode = base64.encodestring(image_read)
+image_64_decode = base64.decodestring(image_64_encode)
+image_result = open('deer_decode.gif', 'wb') # create a writable image and write the decoding result image_result.write(image_64_decode)
+
+def usage(progName):
+    print("\nUsage: %s <String>", progName)
+    return 0
+
+def send_email(user, pwd, recipient, subject, body):
+    import smtplib
+def main():
+    ArgCount = len(sys.argv)
+    if ArgCount < 2 or ArgCount > 2:
+            print("\nInvalid Number of arguments")
+            usage(str(sys.argv[0]))
+            return 1
+    ExecPath=os.getcwd()
+    pwd = str(sys.argv[1])
+    print("\ Input Parameter: %s"%pwd)
+# This file is invoked from the python interpreter
+if __name__ == "__main__":
+        sys.exit(main())
+```
+```basesixtyfour.py
+#!/usr/local/bin/python
+#coding:utf-8
+import sys
+import base64
+def s2b64_encode(file):
+    #bytes -> base64
+    #in  filename(string)
+    #out bytes(base64)
+    return base64.b64encode(open(file, 'rb').read())
+def s2b64_decode(dbytes):
+    #base64 -> bytes -> string
+    #in  bytes
+    #out string
+    return bytes.decode(base64.b64decode(dbytes))
+if __name__ == '__main__':
+    arg  = sys.argv
+    base = s2b64_encode(arg[1])
+    print(base)
+```
+```basesixtyfourdecoder.py
+#!/usr/local/bin/python
+#coding:utf-8
+import sys
+import base64
+def s2b64_encode(file):
+    #bytes -> base64
+    #in  filename(string)
+    #out bytes(base64)
+    return base64.b64encode(open(file, 'rb').read())
+def s2b64_decode(dbytes):
+    #base64 -> bytes -> string
+    #in  bytes
+    #out string
+    return bytes.decode(base64.b64decode(dbytes))
+def usage(progName):
+    print("\nUsage: "+ progName + " <String>")
+    return 0
+def main():
+    ArgCount = len(sys.argv)
+    if ArgCount < 2 or ArgCount > 2:
+        print("\nInvalid Number of arguments")
+        usage(str(sys.argv[0]))
+        return 1
+    arg  = sys.argv
+    base = s2b64_decode(arg[1])
+    print(base)
+if __name__ == '__main__':
+    sys.exit(main())
+```
+```basesixtyfourencoder.py
+#!/usr/local/bin/python
+#coding:utf-8
+import sys
+import base64
+def s2b64_encode(file):
+    #bytes -> base64
+    #in  filename(string)
+    #out bytes(base64)
+    return base64.b64encode(file.encode('utf-8'))
+def s2b64_decode(dbytes):
+    #base64 -> bytes -> string
+    #in  bytes
+    #out string
+    return bytes.decode(base64.b64decode(dbytes))
+def usage(progName):
+    print("\nUsage: "+ progName + " <String>")
+    return 0
+def main():
+    ArgCount = len(sys.argv)
+    if ArgCount < 2 or ArgCount > 2:
+        print("\nInvalid Number of arguments")
+        usage(str(sys.argv[0]))
+        return 1
+    arg  = sys.argv
+    base = s2b64_encode(arg[1])
+    print(base)
+if __name__ == '__main__':
+    sys.exit(main())
+```
+```checkDuplicatedFiles.py
+#!/usr/bin/env python
+import sys
+import os
+import hashlib
+
+def chunk_reader(fobj, chunk_size=1024):
+    """Generator that reads a file in chunks of bytes"""
+    while True:
+        chunk = fobj.read(chunk_size)
+        if not chunk:
+            return
+        yield chunk
+
+def get_hash(filename, first_chunk_only=False, hash=hashlib.sha1):
+    hashobj = hash()
+    file_object = open(filename, 'rb')
+    if first_chunk_only:
+        hashobj.update(file_object.read(1024))
+    else:
+        for chunk in chunk_reader(file_object):
+            hashobj.update(chunk)
+    hashed = hashobj.digest()
+    file_object.close()
+    return hashed
+
+def check_for_duplicates(paths, hash=hashlib.sha1):
+    hashes_by_size = {}
+    hashes_on_1k = {}
+    hashes_full = {}
+    for path in paths:
+        for dirpath, dirnames, filenames in os.walk(path):
+            for filename in filenames:
+                full_path = os.path.join(dirpath, filename)
+                try:
+                    # if the target is a symlink (soft one), this will
+                    # dereference it - change the value to the actual target file
+                    full_path = os.path.realpath(full_path)
+                    file_size = os.path.getsize(full_path)
+                except (OSError,):
+                    # not accessible (permissions, etc) - pass on
+                    continue
+                duplicate = hashes_by_size.get(file_size)
+                if duplicate:
+                    hashes_by_size[file_size].append(full_path)
+                else:
+                    hashes_by_size[file_size] = []  # create the list for this file size
+                    hashes_by_size[file_size].append(full_path)
+    # For all files with the same file size, get their hash on the 1st 1024 bytes
+    for __, files in hashes_by_size.items():
+        if len(files) < 2:
+            continue    # this file size is unique, no need to spend cpy cycles on it
+        for filename in files:
+            try:
+                small_hash = get_hash(filename, first_chunk_only=True)
+            except (OSError,):
+                # the file access might've changed till the exec point got here
+                continue
+            duplicate = hashes_on_1k.get(small_hash)
+            if duplicate:
+                hashes_on_1k[small_hash].append(filename)
+            else:
+                hashes_on_1k[small_hash] = []          # create the list for this 1k hash
+                hashes_on_1k[small_hash].append(filename)
+    # For all files with the hash on the 1st 1024 bytes, get their hash on the full file - collisions will be duplicates
+    for __, files in hashes_on_1k.items():
+        if len(files) < 2:
+            continue    # this hash of fist 1k file bytes is unique, no need to spend cpy cycles on it
+        for filename in files:
+            try:
+                full_hash = get_hash(filename, first_chunk_only=False)
+            except (OSError,):
+                # the file access might've changed till the exec point got here
+                continue
+            duplicate = hashes_full.get(full_hash)
+            if duplicate:
+                print("Duplicate found: %s and %s" % (filename, duplicate))
+            else:
+                hashes_full[full_hash] = filename
+if sys.argv[1:]:
+    check_for_duplicates(sys.argv[1:])
+else:
+    print("Please pass the paths to check as parameters to the script")
+```
+```checkDuplicatedFilesAndRemoveLongFilename.py
+#!/usr/bin/python
+import sys
+import os
+import hashlib
+
+def chunk_reader(fobj, chunk_size=1024):
+    """Generator that reads a file in chunks of bytes"""
+    while True:
+        chunk = fobj.read(chunk_size)
+        if not chunk:
+            return
+        yield chunk
+
+def get_hash(filename, first_chunk_only=False, hash=hashlib.sha1):
+    hashobj = hash()
+    file_object = open(filename, 'rb')
+    if first_chunk_only:
+        hashobj.update(file_object.read(1024))
+    else:
+        for chunk in chunk_reader(file_object):
+            hashobj.update(chunk)
+    hashed = hashobj.digest()
+    file_object.close()
+    return hashed
+
+def check_for_duplicates(paths, hash=hashlib.sha1):
+    hashes_by_size = {}
+    hashes_on_1k = {}
+    hashes_full = {}
+    for path in paths:
+        for dirpath, dirnames, filenames in os.walk(path):
+            for filename in filenames:
+                full_path = os.path.join(dirpath, filename)
+                try:
+                    # if the target is a symlink (soft one), this will
+                    # dereference it - change the value to the actual target file
+                    full_path = os.path.realpath(full_path)
+                    file_size = os.path.getsize(full_path)
+                except (OSError,):
+                    # not accessible (permissions, etc) - pass on
+                    continue
+                duplicate = hashes_by_size.get(file_size)
+                if duplicate:
+                    hashes_by_size[file_size].append(full_path)
+                else:
+                    hashes_by_size[file_size] = []  # create the list for this file size
+                    hashes_by_size[file_size].append(full_path)
+    # For all files with the same file size, get their hash on the 1st 1024 bytes
+    for __, files in hashes_by_size.items():
+        if len(files) < 2:
+            continue    # this file size is unique, no need to spend cpy cycles on it
+        for filename in files:
+            try:
+                small_hash = get_hash(filename, first_chunk_only=True)
+            except (OSError,):
+                # the file access might've changed till the exec point got here
+                continue
+            duplicate = hashes_on_1k.get(small_hash)
+            if duplicate:
+                hashes_on_1k[small_hash].append(filename)
+            else:
+                hashes_on_1k[small_hash] = []          # create the list for this 1k hash
+                hashes_on_1k[small_hash].append(filename)
+
+    # For all files with the hash on the 1st 1024 bytes, get their hash on the full file - collisions will be duplicates
+    for __, files in hashes_on_1k.items():
+        if len(files) < 2:
+            continue    # this hash of fist 1k file bytes is unique, no need to spend cpy cycles on it
+        for filename in files:
+            try:
+                full_hash = get_hash(filename, first_chunk_only=False)
+            except (OSError,):
+                # the file access might've changed till the exec point got here
+                continue
+            duplicate = hashes_full.get(full_hash)
+            if duplicate:
+                print("Duplicate found: %s and %s" % (filename, duplicate))
+                len_filename = len(filename)
+                len_duplicate = len(duplicate)
+                if os.path.exists(duplicate):
+                    if len_filename > len_duplicate:
+                        os.remove(filename)
+                    else:
+                        os.remove(duplicate)
+                else:
+                    print("no file existing")
+            else:
+                hashes_full[full_hash] = filename
+if sys.argv[1:]:
+    check_for_duplicates(sys.argv[1:])
+else:
+    print("Please pass the paths to check as parameters to the script")
+```
+```checkDuplicatedFilesAndRemoveShortFilename.py
+#!/usr/bin/python
+import sys
+import os
+import hashlib
+
+def chunk_reader(fobj, chunk_size=1024):
+    """Generator that reads a file in chunks of bytes"""
+    while True:
+        chunk = fobj.read(chunk_size)
+        if not chunk:
+            return
+        yield chunk
+
+def get_hash(filename, first_chunk_only=False, hash=hashlib.sha1):
+    hashobj = hash()
+    file_object = open(filename, 'rb')
+    if first_chunk_only:
+        hashobj.update(file_object.read(1024))
+    else:
+        for chunk in chunk_reader(file_object):
+            hashobj.update(chunk)
+    hashed = hashobj.digest()
+    file_object.close()
+    return hashed
+
+def check_for_duplicates(paths, hash=hashlib.sha1):
+    hashes_by_size = {}
+    hashes_on_1k = {}
+    hashes_full = {}
+    for path in paths:
+        for dirpath, dirnames, filenames in os.walk(path):
+            for filename in filenames:
+                full_path = os.path.join(dirpath, filename)
+                try:
+                    # if the target is a symlink (soft one), this will
+                    # dereference it - change the value to the actual target file
+                    full_path = os.path.realpath(full_path)
+                    file_size = os.path.getsize(full_path)
+                except (OSError,):
+                    # not accessible (permissions, etc) - pass on
+                    continue
+                duplicate = hashes_by_size.get(file_size)
+                if duplicate:
+                    hashes_by_size[file_size].append(full_path)
+                else:
+                    hashes_by_size[file_size] = []  # create the list for this file size
+                    hashes_by_size[file_size].append(full_path)
+    # For all files with the same file size, get their hash on the 1st 1024 bytes
+    for __, files in hashes_by_size.items():
+        if len(files) < 2:
+            continue    # this file size is unique, no need to spend cpy cycles on it
+        for filename in files:
+            try:
+                small_hash = get_hash(filename, first_chunk_only=True)
+            except (OSError,):
+                # the file access might've changed till the exec point got here
+                continue
+            duplicate = hashes_on_1k.get(small_hash)
+            if duplicate:
+                hashes_on_1k[small_hash].append(filename)
+            else:
+                hashes_on_1k[small_hash] = []          # create the list for this 1k hash
+                hashes_on_1k[small_hash].append(filename)
+
+    # For all files with the hash on the 1st 1024 bytes, get their hash on the full file - collisions will be duplicates
+    for __, files in hashes_on_1k.items():
+        if len(files) < 2:
+            continue    # this hash of fist 1k file bytes is unique, no need to spend cpy cycles on it
+        for filename in files:
+            try:
+                full_hash = get_hash(filename, first_chunk_only=False)
+            except (OSError,):
+                # the file access might've changed till the exec point got here
+                continue
+            duplicate = hashes_full.get(full_hash)
+            if duplicate:
+                print("Duplicate found: %s and %s" % (filename, duplicate))
+                len_filename = len(filename)
+                len_duplicate = len(duplicate)
+                if os.path.exists(duplicate):
+                    if filename > duplicate:
+                        os.remove(filename)
+                    else:
+                        os.remove(duplicate)
+                else:
+                    print("no file existing")
+            else:
+                hashes_full[full_hash] = filename
+if sys.argv[1:]:
+    check_for_duplicates(sys.argv[1:])
+else:
+    print("Please pass the paths to check as parameters to the script")
+```
+```checkmail.py
+import imaplib
+mail = imaplib.IMAP4_SSL('imap.gmail.com')
+mail.login('jones.developer@gmail.com', 'dc71-.RU')
+mail.list()
+# Out: list of "folders" aka labels in gmail.
+mail.select("inbox") # connect to inbox.
+```
+```configure.py
+#!/usr/bin/env python
+import preprocessing
+mysql = {'host': 'localhost',
+         'user': 'root',
+         'passwd': 'my secret password',
+         'db': 'write-math'}
+preprocessing_queue = [preprocessing.scale_and_center,
+                       preprocessing.dot_reduction,
+                       preprocessing.connect_lines]
+use_anonymous = True
+#!/usr/bin/env python
+import preprocessing
+mysql = {'host': 'localhost',
+         'user': 'root',
+         'passwd': 'my secret password',
+         'db': 'write-math'}
+preprocessing_queue = [preprocessing.scale_and_center,
+                       preprocessing.dot_reduction,
+                       preprocessing.connect_lines]
+use_anonymous = True
+```
+```create_dir.py
+#!/usr/bin/python3
+"""
+Code to directly use in file to
+create directory in home location
+Note:- I Have used python package so if you want
+to create in the main directory of your project use
+pardir+"\\"+name in functions
+All the folder operations are done on home
+project directory.
+"""
+from shutil import copytree
+from shutil import move
+from os import chdir
+from os.path import exists
+from os.path import pardir
+from os import makedirs
+from os import removedirs
+from os import rename
+
+# Creates a directory
+def create_directory(name):
+    if exists(pardir+"\\"+name):
+        print('Folder already exists... Cannot Overwrite this')
+    else:
+        makedirs(pardir+"\\"+name)
+
+# Deletes a directory
+def delete_directory(name):
+    removedirs(name)
+
+# Rename a directory
+def rename_directory(direct, name):
+    rename(direct, name)
+
+# Sets the working directory
+def set_working_directory():
+    chdir(pardir)
+
+# Backup the folder tree
+def backup_files(name_dir, folder):
+    copytree(pardir, name_dir + ':\\' + folder)
+
+# Move folder to specific location
+# Overwrites the file if it already exists
+def move_folder(filename, name_dir, folder):
+    if not exists(name_dir+":\\"+folder):
+        makedirs(name_dir+':\\'+folder)
+    move(filename, name_dir+":\\"+folder+'\\')
+
+"""
+For test purpose:
+    1. create_directory("test")
+    2. rename_directory("test","demo")
+    3. delete_directory("demo")
+    4. backup_files('D', 'backup_project')
+    5. move_folder(pardir+'\\'+'test.txt', 'D', 'name')
+"""
+```
+```csvread.py
+import csv
+with open('A2_Location.csv', newline='', encoding='utf-8') as csv_file:
+    csv_reader = csv.reader(csv_file, delimiter=',')
+    line_count = 0
+    for row in csv_reader:
+        if line_count == 0:
+            print(f'Column names are {", ".join(row)}')
+            line_count += 1
+        else:
+            print(f'\t{row[0]} works in the {row[1]} department, and was born in {row[2]}.')
+            line_count += 1
+    print(f'Processed {line_count} lines.')
+```
+```downloadCidianwang.py
+#! python3
+# downloadXkcd.py - Downloads every single XKCD comic.
+import requests, os, bs4
+# url = 'http://xkcd.com' # starting url
+url = 'http://www.cidianwang.com/shufa/zhangsen4439_ls.htm'
+os.makedirs('shufa', exist_ok=True) # store comics in ./shufa
+while not url.endswith('#'):
+    # Download the page.
+    print('Downloading page %s...' % url)
+    res = requests.get(url)
+    res.raise_for_status()
+    soup = bs4.BeautifulSoup(res.text, "lxml")
+    # Find the URL of the comic image.
+    comicElem = soup.select('#comic img')
+    if comicElem == []:
+        print('Could not find comic image.')
+    else:
+        comicUrl = comicElem[0].get('src')
+        # Download the image.
+        print('Downloading image %s...' % (comicUrl))
+        res = requests.get(comicUrl)
+        res.raise_for_status()
+        # Save the image to ./xkcd
+        imageFile = open(os.path.join('xkcd', os.path.basename(comicUrl)), 'wb')
+        for chunk in res.iter_content(100000):
+            imageFile.write(chunk)
+        imageFile.close()
+    # Get the Prev button's url.
+    prevLink = soup.select('a[rel="prev"]')[0]
+    url = 'http://xkcd.com' + prevLink.get('href')
+print('Done.')
+```
+```downloadPage.py
+import urllib2
+user_agent = 'Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_6_4; en-US) AppleWebKit/534.3 (KHTML, like Gecko) Chrome/6.0.472.63 Safari/534.3'
+headers = { 'User-Agent' : user_agent }
+req = urllib2.Request('http://www.google.com', None, headers)
+response = urllib2.urlopen(req)
+page = response.read()
+response.close() # its always safe to close an open connection
+```
+```downloadPage2.py
+import sys
+import pycurl
+class ContentCallback:
+        def __init__(self):
+                self.contents = ''
+        def content_callback(self, buf):
+                self.contents = self.contents + buf
+t = ContentCallback()
+curlObj = pycurl.Curl()
+curlObj.setopt(curlObj.URL, 'http://www.google.com')
+curlObj.setopt(curlObj.WRITEFUNCTION, t.content_callback)
+curlObj.perform()
+curlObj.close()
+print(t.contents)
+```
+```downloadthevectorlab.py
+#! python3
+# downloadXkcd.py - Downloads every single XKCD comic.
+import requests, os, bs4
+url = 'http://thevectorlab.net/theme/?theme=Flat%20Lab' # starting url
+os.makedirs('thevectorlab', exist_ok=True) # store comics in ./xkcd
+while not url.endswith('#'):
+    # Download the page.
+    print('Downloading page %s...' % url)
+    res = requests.get(url)
+    res.raise_for_status()
+    soup = bs4.BeautifulSoup(res.text, "lxml")
+    # Find the URL of the comic image.
+    comicElem = soup.select('#comic img')
+    if comicElem == []:
+        print('Could not find comic image.')
+    else:
+        comicUrl = 'http:'+comicElem[0].get('src')
+        print(comicUrl)
+        # Download the image.
+        print('Downloading image %s...' % (comicUrl))
+        res = requests.get(comicUrl)
+        res.raise_for_status()
+        # Save the image to ./xkcd
+        imageFile = open(os.path.join('xkcd', os.path.basename(comicUrl)), 'wb')
+        for chunk in res.iter_content(100000):
+            imageFile.write(chunk)
+        imageFile.close()
+    # Get the Prev button's url.
+    prevLink = soup.select('a[rel="prev"]')[0]
+    url = 'http://xkcd.com' + prevLink.get('href')
+print('Done.')
+```
+```downloadxkcd.py
+#! python3
+# downloadXkcd.py - Downloads every single XKCD comic.
+import requests, os, bs4
+url = 'http://xkcd.com' # starting url
+os.makedirs('xkcd', exist_ok=True) # store comics in ./xkcd
+while not url.endswith('#'):
+    # Download the page.
+    print('Downloading page %s...' % url)
+    res = requests.get(url)
+    res.raise_for_status()
+    soup = bs4.BeautifulSoup(res.text, "lxml")
+    # Find the URL of the comic image.
+    comicElem = soup.select('#comic img')
+    if comicElem == []:
+        print('Could not find comic image.')
+    else:
+        comicUrl = 'http:'+comicElem[0].get('src')
+        print(comicUrl)
+        # Download the image.
+        print('Downloading image %s...' % (comicUrl))
+        res = requests.get(comicUrl)
+        res.raise_for_status()
+        # Save the image to ./xkcd
+        imageFile = open(os.path.join('xkcd', os.path.basename(comicUrl)), 'wb')
+        for chunk in res.iter_content(100000):
+            imageFile.write(chunk)
+        imageFile.close()
+    # Get the Prev button's url.
+    prevLink = soup.select('a[rel="prev"]')[0]
+    url = 'http://xkcd.com' + prevLink.get('href')
+print('Done.')
+```
+```fileinfo.py
+# Script Name       : fileinfo.py
+# Author                : Not sure where I got this from
+# Created               : 28th November 2011
+# Last Modified     :
+# Version               : 1.0
+# Modifications     :
+# Description           : Show file information for a given file
+
+# get file information using os.stat()
+# tested with Python24 vegsaeat 25sep2006
+from __future__ import print_function
+import os
+import sys
+import stat   # index constants for os.stat()
+import time
+try_count = 16
+while try_count:
+    file_name = input("Enter a file name: ")      # pick a file you have
+    fhand = open(file_name)
+    count = 0
+    for lines in fhand:
+        count = count + 1
+    fhand = open(file_name)
+    inp = fhand.read()
+    t_char = len(inp)
+    try_count >>= 1
+    try:
+        file_stats = os.stat(file_name)
+        print ("This is os.stat",file_stats)
+        break
+    except OSError:
+        print ("\nNameError : [%s] No such file or directory\n", file_name)
+if try_count == 0:
+    print ("Trial limit exceeded \nExiting program")
+    sys.exit()
+# create a dictionary to hold file info
+file_info = {
+    'fname': file_name,
+    'fsize': file_stats[stat.ST_SIZE],
+    'f_lm' : time.strftime("%d/%m/%Y %I:%M:%S %p",
+                           time.localtime(file_stats[stat.ST_MTIME])),
+    'f_la' : time.strftime("%d/%m/%Y %I:%M:%S %p",
+                           time.localtime(file_stats[stat.ST_ATIME])),
+    'f_ct' : time.strftime("%d/%m/%Y %I:%M:%S %p",
+                           time.localtime(file_stats[stat.ST_CTIME])),
+    'no_of_lines':count,
+    't_char':t_char
+}
+print ("\nfile name =", file_info['fname'])
+print ("file size =", file_info['fsize'] , "bytes")
+print ("last modified =", file_info['f_lm'])
+print ("last accessed =", file_info['f_la'])
+print ("creation time =", file_info['f_ct'])
+print ("Total number of lines are =", file_info['no_of_lines'])
+print ("Total number of characters are =", file_info['t_char'])
+if stat.S_ISDIR(file_stats[stat.ST_MODE]):
+    print ("This a directory")
+else:
+    print ("This is not a directory\n")
+    print ("A closer look at the os.stat(%s) tuple:" % file_name)
+    print (file_stats)
+    print ("\nThe above tuple has the following sequence:   ")
+    print ("""st_mode (protection bits), st_ino (inode number),
+    st_dev (device),    st_nlink (number of hard links),
+    st_uid (user ID of owner),   st_gid (group ID of owner),
+    st_size (file size, bytes),  st_atime (last access time, seconds since epoch),
+    st_mtime (last modification time),   st_ctime (time of creation, Windows)"""
+)
+```
+```find.py
+from geopy.geocoders import Nominatim
+geolocator = Nominatim(user_agent="specify_your_app_name_here")
+location = geolocator.reverse("52.509669, 13.376294")
+print(location.address)
+print((location.latitude, location.longitude))
+print(location.raw)
+```
+```genAsciiHTMLTable.py
+#Python is amazing
+#Create ASCII-Char HTML Table
+strTable = "<html><table><tr><th>Char</th><th>ASCII</th></tr>"
+for num in range(33,48):
+ symb = chr(num)
+ strRW = "<tr><td>"+str(symb)+ "</td><td>"+str(num)+"</td></tr>"
+ strTable = strTable+strRW
+strTable = strTable+"</table></html>"
+hs = open("asciiCharHTMLTable.html", 'w')
+hs.write(strTable)
+print(strTable)
+```
+```generate_html.py
+# write-html.py
+import webbrowser
+import os
+print ()
+f = open('helloworld.html','w')
+message = """<html>
+<head></head>
+<body><p>Hello World!</p></body>
+</html>"""
+f.write(message)
+f.close()
+#Change path to reflect file location
+filename = 'file:///'+os.getcwd()+'/' + 'helloworld.html'
+webbrowser.open_new_tab(filename)
+```
+```geo2latlong.py
+import requests
+import json
+import pprint
+# Goole Maps API.
+link = "http://www.mapquestapi.com/geocoding/v1/address?key=fGNAgJu8e2nntNwu7Nb73QqQHixMgAvd&location=%E9%AB%98%E9%9B%84%E5%B8%82%E5%A4%A7%E5%AF%AE%E5%8D%80%E9%B3%B3%E6%9E%97%E4%B8%89%E8%B7%AF345%E8%99%9F"
+# Request data from link as 'str'
+data = requests.get(link).text
+# convert 'str' to Json
+data = json.loads(data)
+#print(json.dumps(data, indent=4, sort_keys=True))
+#pprint.pprint(data)
+lattitude = data['results'][0]['locations'][0]['displayLatLng']['lat']
+longitude = data['results'][0]['locations'][0]['displayLatLng']['lng']
+print('{}, {}'.format(lattitude, longitude))
+```
+```geolocate.py
+# -*- coding: UTF-8 -*-
+import json, logging
+from geopy.geocoders import Nominatim
+geolocator = Nominatim(user_agent="ATM")
+location = geolocator.geocode("�_�ʤѦw��")
+print(location.address)
+print((location.latitude, location.longitude))
+print(location.raw)
+print json.dumps(location.raw, indent=4, ensure_ascii=False, encoding='utf8')
+```
+```get_ppt_artical.py
+#!/usr/bin/python
+from bs4 import BeautifulSoup
+import time
+import requests
+def get_articles(dom, date):
+    soup = BeautifulSoup(dom, 'html.parser')
+    articles = []  # 儲存取得的文章資料
+    divs = soup.find_all('div', 'r-ent')
+    for d in divs:
+        if d.find('div', 'date').string == date:  # 發文日期正確
+            # 取得推文數
+            push_count = 0
+            if d.find('div', 'nrec').string:
+                try:
+                    push_count = int(d.find('div', 'nrec').string)  # 轉換字串為數字
+                except ValueError:  # 若轉換失敗，不做任何事，push_count 保持為 0
+                    pass
+            # 取得文章連結及標題
+            if d.find('a'):  # 有超連結，表示文章存在，未被刪除
+                href = d.find('a')['href']
+                title = d.find('a').string
+                articles.append({
+                    'title': title,
+                    'href': href,
+                    'push_count': push_count
+                })
+    return articles
+
+def get_web_page(url):
+    resp = requests.get(
+        url=url,
+        cookies={'over18': '1'}
+    )
+    if resp.status_code != 200:
+        print('Invalid url:', resp.url)
+        return None
+    else:
+        return resp.text
+
+page = get_web_page('https://www.ptt.cc/bbs/Beauty/index.html')
+if page:
+    date = time.strftime("%m/%d").lstrip('0')
+    current_articles = get_articles(page, date)
+    for post in current_articles:
+        print(post)
+```
+```gmail_imap_python3.py
+#!/usr/bin/env python
+#
+# Very basic example of using Python 3 and IMAP to iterate over emails in a
+# gmail folder/label.  This code is released into the public domain.
+#
+# This script is example code from this blog post:
+# http://www.voidynullness.net/blog/2013/07/25/gmail-email-with-python-via-imap/
+#
+# This is an updated version of the original -- modified to work with Python 3.4.
+#
+import sys
+import imaplib
+import getpass
+import email
+import email.header
+import datetime
+
+EMAIL_ACCOUNT = "jones.developer@gmail.com"
+# Use 'INBOX' to read inbox.  Note that whatever folder is specified,
+# after successfully running this script all emails in that folder
+# will be marked as read.
+EMAIL_FOLDER = "INBOX"
+
+def process_mailbox(M):
+    """
+    Do something with emails messages in the folder.
+    For the sake of this example, print some headers.
+    """
+    rv, data = M.search(None, "ALL")
+    if rv != 'OK':
+        print("No messages found!")
+        return
+    for num in data[0].split():
+        rv, data = M.fetch(num, '(RFC822)')
+        if rv != 'OK':
+            print("ERROR getting message", num)
+            return
+        msg = email.message_from_bytes(data[0][1])
+        hdr = email.header.make_header(email.header.decode_header(msg['Subject']))
+        subject = str(hdr)
+        print('Message %s: %s' % (num, subject))
+        print('Raw Date:', msg['Date'])
+        # Now convert to local date-time
+        date_tuple = email.utils.parsedate_tz(msg['Date'])
+        if date_tuple:
+            local_date = datetime.datetime.fromtimestamp(
+                email.utils.mktime_tz(date_tuple))
+            print ("Local Date:", \
+                local_date.strftime("%a, %d %b %Y %H:%M:%S"))
+
+M = imaplib.IMAP4_SSL('imap.gmail.com')
+try:
+    rv, data = M.login(EMAIL_ACCOUNT, getpass.getpass())
+except imaplib.IMAP4.error:
+    print ("LOGIN FAILED!!! ")
+    sys.exit(1)
+print(rv, data)
+rv, mailboxes = M.list()
+if rv == 'OK':
+    print("Mailboxes:")
+    print(mailboxes)
+rv, data = M.select(EMAIL_FOLDER)
+if rv == 'OK':
+    print("Processing mailbox...\n")
+    process_mailbox(M)
+    M.close()
+else:
+    print("ERROR: Unable to open mailbox ", rv)
+M.logout()
+```
+```GuessNumber.py
+import random
+secretNumber = random.randint(1,99)
+print("I's thinking of number 1-99.")
+#5 times
+for guessTaken in range(1, 6):
+    print("take a guess")
+    guess = int(input())
+    if guess < secretNumber:
+        print("your guess is too low")
+    elif guess > secretNumber:
+        print("your guess is too high")
+    else:
+        break
+
+if guess == secretNumber:
+    print("Good job! you found my number")
+else:
+    print("Nope, my number is" + str(secretNumber))
+```
+```image grapper - Copy.py
+#!/usr/bin/python3
+from os import chdir
+import requests
+from bs4 import BeautifulSoup
+from urllib.request import urlopen, Request
+from urllib.parse import urlencode
+from os import walk
+import json
+from os.path import curdir
+from urllib.request import urlretrieve
+from os.path import pardir
+from create_dir import create_directory
+GOOGLE_IMAGE = 'https://www.google.com/search?site=&tbm=isch&source=hp&biw=1873&bih=990&'
+WALLPAPERS_KRAFT = 'https://wallpaperscraft.com/search/keywords?'
+usr_agent = {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
+        'Accept-Encoding': 'none',
+        'Accept-Language': 'en-US,en;q=0.8',
+        'Connection': 'keep-alive'
+        }
+
+def image_grabber(ch):
+    # Download images from google images
+    if ch == 1:
+        print('Enter data to download Images: ')
+        data = input()
+        search_query = {'q': data}
+        search = urlencode(search_query)
+        print(search)
+        g = GOOGLE_IMAGE + search
+        request = Request(g, headers=usr_agent)
+        r = urlopen(request).read()
+        sew = BeautifulSoup(r, 'html.parser')
+        images = []
+        print(sew.prettify())
+        results = sew.findAll("div",{"class":"rg_meta"})
+        for re in results:
+            link, Type = json.loads(re.text)["ou"] , json.loads(re.text)["ity"]
+            images.append(link)
+        counter = 0
+        for re in images:
+            rs = requests.get(re)
+            with open('img' + str(counter) + '.jpg', 'wb') as file:
+                file.write(rs.content)
+                urlretrieve(re, 'img' + str(count) + '.jpg')
+                counter += 1
+        return True
+    elif ch == 2:
+        cont = set()  # Stores the links of images
+        temp = set()  # Refines the links to download images
+        print('Enter data to download wallpapers: ')
+        data = input()
+        search_query = {'q': data}
+        search = urlencode(search_query)
+        print(search)
+        g = WALLPAPERS_KRAFT + search
+        request = Request(g, headers=usr_agent)
+        r = urlopen(request).read()
+        sew = BeautifulSoup(r, 'html.parser')
+        count = 0
+        for links in sew.find_all('a'):
+            if 'wallpaperscraft.com/download' in links.get('href'):
+                cont.add(links.get('href'))
+        for re in cont:
+            # print all valid links
+            # print('https://wallpaperscraft.com/image/' + re[31:-10] + '_' + re[-9:] + '.jpg')
+            temp.add('https://wallpaperscraft.com/image/' + re[31:-10] + '_' + re[-9:] + '.jpg')
+        # Goes to Each link and downloads high resolution images
+        for re in temp:
+            rs = requests.get(re)
+            with open('img' + str(count) + '.jpg', 'wb') as file:
+                file.write(rs.content)
+            # urlretrieve(re, 'img' + str(count) + '.jpg')
+            count += 1
+        return True
+    elif ch == 3:
+        for folders, subfolder, files in walk(curdir):
+            for folder in subfolder:
+                print(folder)
+        return True
+    elif ch == 4:
+        print('Enter the directory to be set: ')
+        data = input()
+        chdir(data + ':\\')
+        print('Enter name for the folder: ')
+        data = input()
+        create_directory(data)
+        return True
+    elif ch == 5:
+        print(
+                '''
+-------------------------***Thank You For Using***-------------------------
+            '''
+            )
+        return False
+
+run = True
+print(
+        '''
+***********[First Creating Folder To Save Your Images}***********
+    '''
+    )
+create_directory('Images')
+DEFAULT_DIRECTORY = pardir + '\\Images'
+chdir(DEFAULT_DIRECTORY)
+while run:
+    print('''
+-------------------------WELCOME-------------------------
+    1. Search for image
+    2. Download Wallpapers 1080p
+    3. View Images in your directory
+    4. Set directory
+    5. Exit
+-------------------------*******-------------------------
+    ''')
+    choice = input()
+    run = image_grabber(int(choice))
+```
+```image grapper.py
+#!/usr/bin/python3
+from os import chdir
+import requests
+from bs4 import BeautifulSoup
+from urllib.request import urlopen, Request
+from urllib.parse import urlencode
+from os import walk
+import json
+from os.path import curdir
+from urllib.request import urlretrieve
+from os.path import pardir
+from create_dir import create_directory
+GOOGLE_IMAGE = 'https://www.google.com/search?site=&tbm=isch&source=hp&biw=1873&bih=990&'
+WALLPAPERS_KRAFT = 'https://wallpaperscraft.com/search/?'
+usr_agent = {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
+        'Accept-Encoding': 'none',
+        'Accept-Language': 'en-US,en;q=0.8',
+        'Connection': 'keep-alive'
+        }
+
+def image_grabber(ch):
+    # Download images from google images
+    if ch == 1:
+        print('Enter data to download Images: ')
+        data = input()
+        search_query = {'q': data}
+        search = urlencode(search_query)
+        print(search)
+        g = GOOGLE_IMAGE + search
+        request = Request(g, headers=usr_agent)
+        r = urlopen(request).read()
+        sew = BeautifulSoup(r, 'html.parser')
+        images = []
+        # print(sew.prettify())
+        results = sew.findAll("div",{"class":"rg_meta"})
+        for re in results:
+            link, Type = json.loads(re.text)["ou"] , json.loads(re.text)["ity"]
+            images.append(link)
+        counter = 0
+        for re in images:
+            rs = requests.get(re)
+            with open('img' + str(counter) + '.jpg', 'wb') as file:
+                file.write(rs.content)
+                # urlretrieve(re, 'img' + str(count) + '.jpg')
+                counter += 1
+        return True
+    elif ch == 2:
+        cont = set()  # Stores the links of images
+        temp = set()  # Refines the links to download images
+        print('Enter data to download wallpapers: ')
+        data = input()
+        search_query = {'query': data}
+        search = urlencode(search_query)
+        print(search)
+        g = WALLPAPERS_KRAFT + search
+        print(g)
+        request = Request(g, headers=usr_agent)
+        r = urlopen(request).read()
+        sew = BeautifulSoup(r, 'html.parser')
+        print(sew)
+        count = 0
+        for links in sew.find_all('a'):
+            if 'wallpaperscraft.com/download' in links.get('href'):
+                cont.add(links.get('href'))
+        for re in cont:
+            # print all valid links
+            # print('https://wallpaperscraft.com/image/' + re[31:-10] + '_' + re[-9:] + '.jpg')
+            temp.add('https://wallpaperscraft.com/image/' + re[31:-10] + '_' + re[-9:] + '.jpg')
+        # Goes to Each link and downloads high resolution images
+        for re in temp:
+            rs = requests.get(re)
+            with open('img' + str(count) + '.jpg', 'wb') as file:
+                file.write(rs.content)
+            # urlretrieve(re, 'img' + str(count) + '.jpg')
+            count += 1
+        return True
+    elif ch == 3:
+        for folders, subfolder, files in walk(curdir):
+            for folder in subfolder:
+                print(folder)
+        return True
+    elif ch == 4:
+        print('Enter the directory to be set: ')
+        data = input()
+        chdir(data + ':\\')
+        print('Enter name for the folder: ')
+        data = input()
+        create_directory(data)
+        return True
+    elif ch == 5:
+        print(
+                '''
+-------------------------***Thank You For Using***-------------------------
+            '''
+            )
+        return False
+
+run = True
+print(
+        '''
+***********[First Creating Folder To Save Your Images}***********
+    '''
+    )
+create_directory('Images')
+DEFAULT_DIRECTORY = pardir + '\\Images'
+chdir(DEFAULT_DIRECTORY)
+while run:
+    print('''
+-------------------------WELCOME-------------------------
+    1. Search for image
+    2. Download Wallpapers 1080p
+    3. View Images in your directory
+    4. Set directory
+    5. Exit
+-------------------------*******-------------------------
+    ''')
+    choice = input()
+    run = image_grabber(int(choice))
+```
+```image_downloader.py
+from bs4 import *
+from urllib.request import urlopen
+from urllib import parse
+from os import chdir
+import requests
+from bs4 import BeautifulSoup
+from urllib.request import urlopen, Request
+from urllib.parse import urlencode
+from os import walk
+import json
+from os.path import curdir
+from urllib.request import urlretrieve
+from os.path import pardir
+from create_dir import create_directory
+
+def make_soup(url):
+    html = urlopen(url).read()
+    return BeautifulSoup(html, 'html.parser')
+def get_images(url):
+    soup = make_soup(url)
+    images = [img for img in soup.findAll('img')]
+    print(str(len(images)) + "images found.")
+    print('Downloading images to current working directory.')
+    #compile our unicode list of image links
+    image_links = [each.get('src') for each in images]
+    for each in image_links:
+        filename=each.split('/')[-1]
+        urllib.urlretrieve(each,filename )
+    return image_links
+url=input("enter the url ")
+get_images(url)
+```
+```img_base64_encode.py
+python import base64
+image = open('deer.gif', 'rb')
+image_read = image.read()
+image_64_encode = base64.encodestring(image_read)
+image_64_decode = base64.decodestring(image_64_encode)
+image_result = open('deer_decode.gif', 'wb') # create a writable image and write the decoding result image_result.write(image_64_decode)
+```
+```JonesTorrentStarter.py
+#! python3
+# Checks for instructions via email and runs them.
+# So far, this program checks for BitTorrent "magnet" links and launches the torrent program for them.
+import smtplib, imapclient, pyzmail, logging, traceback, time, subprocess
+logging.basicConfig(filename='torrentStarterLog.txt', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configure the program by setting some variables.
+MY_EMAIL = 'morchaos@gmail.com' # bot should only respond to me
+BOT_EMAIL = 'jones.autobot@gmail.com'
+# TODO need a method to encrypt the password
+BOT_EMAIL_PASSWORD = '1978Morchaos'
+IMAP_SERVER = 'imap.gmail.com'
+SMTP_SERVER = 'smtp.gmail.com'
+SMTP_PORT = 587
+#TORRENT_PROGRAM = 'C:\\qBittorrentPortable\\qbittorrent.exe'
+TORRENT_PROGRAM = 'C:/qBittorrentPortable/qBittorrentPortable.exe'
+assert BOT_EMAIL != MY_EMAIL, "Give the bot it's own email address."
+
+def getInstructionEmails():
+    # Log in to the email imapCli.
+    logging.debug('Connecting to IMAP server at %s...' % (IMAP_SERVER))
+    imapCli = imapclient.IMAPClient(IMAP_SERVER, ssl=True)
+    imapCli.login(BOT_EMAIL, BOT_EMAIL_PASSWORD)
+    imapCli.select_folder('INBOX')
+    logging.debug('Connected.')
+    # Fetch all instruction emails.
+    instructions = []
+    #UIDs = imapCli.search(['FROM ' + MY_EMAIL])
+    UIDs = imapCli.search(['FROM', MY_EMAIL])
+    rawMessages = imapCli.fetch(UIDs, ['BODY[]'])
+    #rawMessages = imapCli.fetch(UIDs, [b'BODY[]'])
+    for UID in rawMessages.keys():
+        # Parse the raw email message.
+        message = pyzmail.PyzMessage.factory(rawMessages[UID][b'BODY[]'])
+        if message.html_part != None:
+            body = message.html_part.get_payload().decode(message.html_part.charset)
+        if message.text_part != None:
+            # If there's both an html and text part, use the text part.
+            body = message.text_part.get_payload().decode(message.text_part.charset)
+        # Extract instruction from email body.
+        instructions.append(body)
+    # Delete the instruction emails, if there are any.
+    if len(UIDs) > 0:
+        imapCli.delete_messages(UIDs)
+        imapCli.expunge()
+    imapCli.logout()
+    return instructions
+
+def parseInstructionEmail(instruction):
+    # Send an email response about the task.
+    responseBody = 'Subject: Instruction completed.\nInstruction received and completed.\nResponse:\n'
+    # Parse the email body to figure out the instruction.
+    lines = instruction.split('\n')
+    for line in lines:
+        if line.startswith('magnet:?'):
+            #subprocess.Popen(TORRENT_PROGRAM + ' ' + line) # launch the bittorrent program
+            subprocess.Popen(TORRENT_PROGRAM + ' ' + line) # launch the bittorrent program
+            responseBody += 'Downloading magnet link.\n'
+    # Email the response body to confirm the bot carried out this instruction.
+    logging.debug('Connecting to SMTP server at %s to send confirmation email...' % (SMTP_SERVER))
+    smtpCli = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)     # uncomment one or the other as needed.
+    #smtpCli = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) # uncomment one or the other as needed.
+    smtpCli.ehlo()
+    smtpCli.starttls() # comment this out if using SMTP_SSL
+    smtpCli.login(BOT_EMAIL, BOT_EMAIL_PASSWORD)
+    logging.debug('Connected.')
+    smtpCli.sendmail(BOT_EMAIL, MY_EMAIL, responseBody)
+    logging.debug('Confirmation email sent.')
+    smtpCli.quit()
+
+# Start an infinite loop that checks email and carries out instructions.
+print('Email bot started. Press Ctrl-C to quit.')
+logging.debug('Email bot started.')
+while True:
+    try:
+        logging.debug('Getting instructions from email...')
+        instructions = getInstructionEmails()
+        for instruction in instructions:
+            logging.debug('Doing instruction: ' + instruction)
+            parseInstructionEmail(instruction)
+    except Exception as err:
+        logging.error(traceback.format_exc())
+    # Wait 15 minutes before checking again
+    logging.debug('Done processing instructions. Pausing for 15 minutes.')
+    time.sleep(60 * 15)
+```
+```jones_json.py
+import json
+from pprint import pprint
+with open('config.json', 'r') as fp:
+    obj = json.load(fp)
+pprint(obj)
+```
+```json_config.py
+import json
+from pprint import pprint
+import sys
+import base64
+def usage(progName):
+    print("\nUsage: "+ progName + " <String>")
+    return 0
+def s2b64_encode(file):
+    #bytes -> base64
+    #in  filename(string)
+    #out bytes(base64)
+    return base64.b64encode(file.encode('utf-8'))
+def s2b64_decode(dbytes):
+    #base64 -> bytes -> string
+    #in  bytes
+    #out string
+    return bytes.decode(base64.b64decode(dbytes))
+def parseConfig(fileName):
+    with open(fileName, 'r') as fp:
+        obj = json.load(fp)
+    #pprint(obj)
+    return obj
+def main():
+    ArgCount = len(sys.argv)
+    if ArgCount < 2 or ArgCount > 2:
+        print("\nInvalid Number of arguments")
+        usage(str(sys.argv[0]))
+        return 1
+    arg  = sys.argv
+    jsonObj = parseConfig(arg[1])
+    print("\nbefore processing:")
+    pprint(jsonObj)
+    #decode and processing
+    jsonObj[0]["MY_EMAIL"] = s2b64_decode(jsonObj[0]["MY_CODE"])
+    jsonObj[0]["BOT_EMAIL"] = s2b64_decode(jsonObj[0]["BOT_CODE"])
+    jsonObj[0]["BOT_EMAIL_PASSWORD"] = s2b64_decode(jsonObj[0]["PASS_CODE"])
+    jsonObj[0]["IMAP_SERVER"] = s2b64_decode(jsonObj[0]["RECEIVE_CODE"])
+    jsonObj[0]["SMTP_SERVER"] = s2b64_decode(jsonObj[0]["TRANSIT_CODE"])
+    jsonObj[0]["SMTP_PORT"] = s2b64_decode(jsonObj[0]["PORT_CODE"])
+    jsonObj[0]["TORRENT_PROGRAM"] = s2b64_decode(jsonObj[0]["RUN_CODE"])
+
+    #display the final result
+    print("\nbefore processing:")
+    pprint(jsonObj)
+if __name__ == '__main__':
+    sys.exit(main())
+```
+```json_obj.py
+import smtplib, imapclient, pyzmail, logging, traceback, time, subprocess
+import json
+from pprint import pprint
+# JSON objects definition below
+# For BOT JSON object information definition, i.e bot mail address, servers information for accessing
+botObj = '{"username": "jones.autobot@gmail.com", "password": "1978Morchaos"}'
+# For control side JSON object information definition, i.e remote mail address
+ctrlObj = '{"username": "morchaos@gmail.com"}'
+# For common servers JSON object information
+serverObj = '{"imap": "imap.gmail.com", "smtp": "smtp.gmail.com", "sport": 587}'
+# For local JSON object configuration information, i.e timming, executable program
+configObj = '{"token": "magnet:?", "program": "C:/qBittorrentPortable/qBittorrentPortable.exe", "poll": 15}'
+obj1 = obj = json.loads(configObj)
+print(obj1["poll"])
+```
+```json_shower.py
+import json
+from pprint import pprint
+import sys
+def usage(progName):
+    print("\nUsage: "+ progName + " <String>")
+    return 0
+def main():
+    ArgCount = len(sys.argv)
+    if ArgCount < 2 or ArgCount > 2:
+        print("\nInvalid Number of arguments")
+        usage(str(sys.argv[0]))
+        return 1
+    arg  = sys.argv
+    with open(arg[1], 'r') as fp:
+        obj = json.load(fp)
+    pprint(obj)
+if __name__ == '__main__':
+    sys.exit(main())
+```
+```ListFilePy.py
+import os
+for filename in os.listdir('.'):
+    if filename.endswith('.py'):
+        #os.unlink(filename)
+        print(filename)
+```
+```loggen.py
+import time
+import logging
+timeString = time.strftime("%Y%m%d%H%M%S")
+logging.basicConfig(filename='python' + timeString + '.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.debug('Start')
+logging.debug('End')
+```
+```measuring.py
+from geopy.distance import geodesic
+newport_ri = (41.49008, -71.312796)
+cleveland_oh = (41.499498, -81.695391)
+print(geodesic(newport_ri, cleveland_oh).miles)
+```
+```measuring_great_circle.py
+from geopy.distance import great_circle
+newport_ri = (41.49008, -71.312796)
+cleveland_oh = (41.499498, -81.695391)
+print(great_circle(newport_ri, cleveland_oh).miles)
+```
+```move_files_over_x_days.py
+# Script Name   : move_files_over_x_days.py
+# Author(s)     : Craig Richards ,Demetrios Bairaktaris
+# Created       : 8th December 2011
+# Last Modified : 25 December 2017
+# Version       : 1.1
+# Modifications : Added possibility to use command line arguments to specify source, destination, and days.
+# Description   : This will move all the files from the src directory that are over 240 days old to the destination directory.
+import shutil
+import sys
+import time
+import os
+import argparse
+usage = 'python move_files_over_x_days.py -src [SRC] -dst [DST] -days [DAYS]'
+description = 'Move files from src to dst if they are older than a certain number of days.  Default is 240 days'
+args_parser = argparse.ArgumentParser(usage=usage, description=description)
+args_parser.add_argument('-src', '--src', type=str, nargs='?', default='.', help='(OPTIONAL) Directory where files will be moved from. Defaults to current directory')
+args_parser.add_argument('-dst', '--dst', type=str, nargs='?', required=True, help='(REQUIRED) Directory where files will be moved to.')
+args_parser.add_argument('-days', '--days', type=int, nargs='?', default=240, help='(OPTIONAL) Days value specifies the minimum age of files to be moved. Default is 240.')
+args = args_parser.parse_args()
+if args.days < 0:
+        args.days = 0
+src = args.src  # Set the source directory
+dst = args.dst  # Set the destination directory
+days = args.days #Set the number of days
+now = time.time()  # Get the current time
+if not os.path.exists(dst):
+        os.mkdir(dst)
+for f in os.listdir(src):  # Loop through all the files in the source directory
+    if os.stat(f).st_mtime < now - days * 86400:  # Work out how old they are, if they are older than 240 days old
+        if os.path.isfile(f):  # Check it's a file
+            shutil.move(f, dst)  # Move the files
+```
+```oauth2.py
+#!/usr/bin/python
+#
+# Copyright 2012 Google Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+     # http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Performs client tasks for testing IMAP OAuth2 authentication.
+To use this script, you'll need to have registered with Google as an OAuth
+application and obtained an OAuth client ID and client secret.
+See https://developers.google.com/identity/protocols/OAuth2 for instructions on
+registering and for documentation of the APIs invoked by this code.
+This script has 3 modes of operation.
+1. The first mode is used to generate and authorize an OAuth2 token, the
+first step in logging in via OAuth2.
+  oauth2 --user=xxx@gmail.com \
+    --client_id=1038[...].apps.googleusercontent.com \
+    --client_secret=VWFn8LIKAMC-MsjBMhJeOplZ \
+    --generate_oauth2_token
+The script will converse with Google and generate an oauth request
+token, then present you with a URL you should visit in your browser to
+authorize the token. Once you get the verification code from the Google
+website, enter it into the script to get your OAuth access token. The output
+from this command will contain the access token, a refresh token, and some
+metadata about the tokens. The access token can be used until it expires, and
+the refresh token lasts indefinitely, so you should record these values for
+reuse.
+2. The script will generate new access tokens using a refresh token.
+  oauth2 --user=xxx@gmail.com \
+    --client_id=1038[...].apps.googleusercontent.com \
+    --client_secret=VWFn8LIKAMC-MsjBMhJeOplZ \
+    --refresh_token=1/Yzm6MRy4q1xi7Dx2DuWXNgT6s37OrP_DW_IoyTum4YA
+3. The script will generate an OAuth2 string that can be fed
+directly to IMAP or SMTP. This is triggered with the --generate_oauth2_string
+option.
+  oauth2 --generate_oauth2_string --user=xxx@gmail.com \
+    --access_token=ya29.AGy[...]ezLg
+The output of this mode will be a base64-encoded string. To use it, connect to a
+IMAPFE and pass it as the second argument to the AUTHENTICATE command.
+  a AUTHENTICATE XOAUTH2 a9sha9sfs[...]9dfja929dk==
+"""
+import base64
+import imaplib
+import json
+from optparse import OptionParser
+import smtplib
+import sys
+import urllib
+
+def SetupOptionParser():
+  # Usage message is the module's docstring.
+  parser = OptionParser(usage=__doc__)
+  parser.add_option('--generate_oauth2_token',
+                    action='store_true',
+                    dest='generate_oauth2_token',
+                    help='generates an OAuth2 token for testing')
+  parser.add_option('--generate_oauth2_string',
+                    action='store_true',
+                    dest='generate_oauth2_string',
+                    help='generates an initial client response string for '
+                         'OAuth2')
+  parser.add_option('--client_id',
+                    default=None,
+                    help='Client ID of the application that is authenticating. '
+                         'See OAuth2 documentation for details.')
+  parser.add_option('--client_secret',
+                    default=None,
+                    help='Client secret of the application that is '
+                         'authenticating. See OAuth2 documentation for '
+                         'details.')
+  parser.add_option('--access_token',
+                    default=None,
+                    help='OAuth2 access token')
+  parser.add_option('--refresh_token',
+                    default=None,
+                    help='OAuth2 refresh token')
+  parser.add_option('--scope',
+                    default='https://mail.google.com/',
+                    help='scope for the access token. Multiple scopes can be '
+                         'listed separated by spaces with the whole argument '
+                         'quoted.')
+  parser.add_option('--test_imap_authentication',
+                    action='store_true',
+                    dest='test_imap_authentication',
+                    help='attempts to authenticate to IMAP')
+  parser.add_option('--test_smtp_authentication',
+                    action='store_true',
+                    dest='test_smtp_authentication',
+                    help='attempts to authenticate to SMTP')
+  parser.add_option('--user',
+                    default=None,
+                    help='email address of user whose account is being '
+                         'accessed')
+  parser.add_option('--quiet',
+                    action='store_true',
+                    default=False,
+                    dest='quiet',
+                    help='Omit verbose descriptions and only print '
+                         'machine-readable outputs.')
+  return parser
+
+# The URL root for accessing Google Accounts.
+GOOGLE_ACCOUNTS_BASE_URL = 'https://accounts.google.com'
+
+# Hardcoded dummy redirect URI for non-web apps.
+REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
+
+def AccountsUrl(command):
+  """Generates the Google Accounts URL.
+  Args:
+    command: The command to execute.
+  Returns:
+    A URL for the given command.
+  """
+  return '%s/%s' % (GOOGLE_ACCOUNTS_BASE_URL, command)
+
+def UrlEscape(text):
+  # See OAUTH 5.1 for a definition of which characters need to be escaped.
+  return urllib.quote(text, safe='~-._')
+
+def UrlUnescape(text):
+  # See OAUTH 5.1 for a definition of which characters need to be escaped.
+  return urllib.unquote(text)
+
+def FormatUrlParams(params):
+  """Formats parameters into a URL query string.
+  Args:
+    params: A key-value map.
+  Returns:
+    A URL query string version of the given parameters.
+  """
+  param_fragments = []
+  for param in sorted(params.iteritems(), key=lambda x: x[0]):
+    param_fragments.append('%s=%s' % (param[0], UrlEscape(param[1])))
+  return '&'.join(param_fragments)
+
+def GeneratePermissionUrl(client_id, scope='https://mail.google.com/'):
+  """Generates the URL for authorizing access.
+  This uses the "OAuth2 for Installed Applications" flow described at
+  https://developers.google.com/accounts/docs/OAuth2InstalledApp
+  Args:
+    client_id: Client ID obtained by registering your app.
+    scope: scope for access token, e.g. 'https://mail.google.com'
+  Returns:
+    A URL that the user should visit in their browser.
+  """
+  params = {}
+  params['client_id'] = client_id
+  params['redirect_uri'] = REDIRECT_URI
+  params['scope'] = scope
+  params['response_type'] = 'code'
+  return '%s?%s' % (AccountsUrl('o/oauth2/auth'),
+                    FormatUrlParams(params))
+
+def AuthorizeTokens(client_id, client_secret, authorization_code):
+  """Obtains OAuth access token and refresh token.
+  This uses the application portion of the "OAuth2 for Installed Applications"
+  flow at https://developers.google.com/accounts/docs/OAuth2InstalledApp#handlingtheresponse
+  Args:
+    client_id: Client ID obtained by registering your app.
+    client_secret: Client secret obtained by registering your app.
+    authorization_code: code generated by Google Accounts after user grants
+        permission.
+  Returns:
+    The decoded response from the Google Accounts server, as a dict. Expected
+    fields include 'access_token', 'expires_in', and 'refresh_token'.
+  """
+  params = {}
+  params['client_id'] = client_id
+  params['client_secret'] = client_secret
+  params['code'] = authorization_code
+  params['redirect_uri'] = REDIRECT_URI
+  params['grant_type'] = 'authorization_code'
+  request_url = AccountsUrl('o/oauth2/token')
+  response = urllib.urlopen(request_url, urllib.urlencode(params)).read()
+  return json.loads(response)
+
+def RefreshToken(client_id, client_secret, refresh_token):
+  """Obtains a new token given a refresh token.
+  See https://developers.google.com/accounts/docs/OAuth2InstalledApp#refresh
+  Args:
+    client_id: Client ID obtained by registering your app.
+    client_secret: Client secret obtained by registering your app.
+    refresh_token: A previously-obtained refresh token.
+  Returns:
+    The decoded response from the Google Accounts server, as a dict. Expected
+    fields include 'access_token', 'expires_in', and 'refresh_token'.
+  """
+  params = {}
+  params['client_id'] = client_id
+  params['client_secret'] = client_secret
+  params['refresh_token'] = refresh_token
+  params['grant_type'] = 'refresh_token'
+  request_url = AccountsUrl('o/oauth2/token')
+  response = urllib.urlopen(request_url, urllib.urlencode(params)).read()
+  return json.loads(response)
+
+def GenerateOAuth2String(username, access_token, base64_encode=True):
+  """Generates an IMAP OAuth2 authentication string.
+  See https://developers.google.com/google-apps/gmail/oauth2_overview
+  Args:
+    username: the username (email address) of the account to authenticate
+    access_token: An OAuth2 access token.
+    base64_encode: Whether to base64-encode the output.
+  Returns:
+    The SASL argument for the OAuth2 mechanism.
+  """
+  auth_string = 'user=%s\1auth=Bearer %s\1\1' % (username, access_token)
+  if base64_encode:
+    auth_string = base64.b64encode(auth_string)
+  return auth_string
+
+def TestImapAuthentication(user, auth_string):
+  """Authenticates to IMAP with the given auth_string.
+  Prints a debug trace of the attempted IMAP connection.
+  Args:
+    user: The Gmail username (full email address)
+    auth_string: A valid OAuth2 string, as returned by GenerateOAuth2String.
+        Must not be base64-encoded, since imaplib does its own base64-encoding.
+  """
+  print
+  imap_conn = imaplib.IMAP4_SSL('imap.gmail.com')
+  imap_conn.debug = 4
+  imap_conn.authenticate('XOAUTH2', lambda x: auth_string)
+  imap_conn.select('INBOX')
+
+def TestSmtpAuthentication(user, auth_string):
+  """Authenticates to SMTP with the given auth_string.
+  Args:
+    user: The Gmail username (full email address)
+    auth_string: A valid OAuth2 string, not base64-encoded, as returned by
+        GenerateOAuth2String.
+  """
+  print
+  smtp_conn = smtplib.SMTP('smtp.gmail.com', 587)
+  smtp_conn.set_debuglevel(True)
+  smtp_conn.ehlo('test')
+  smtp_conn.starttls()
+  smtp_conn.docmd('AUTH', 'XOAUTH2 ' + base64.b64encode(auth_string))
+
+def RequireOptions(options, *args):
+  missing = [arg for arg in args if getattr(options, arg) is None]
+  if missing:
+    print 'Missing options: %s' % ' '.join(missing)
+    sys.exit(-1)
+
+def main(argv):
+  options_parser = SetupOptionParser()
+  (options, args) = options_parser.parse_args()
+  if options.refresh_token:
+    RequireOptions(options, 'client_id', 'client_secret')
+    response = RefreshToken(options.client_id, options.client_secret,
+                            options.refresh_token)
+    if options.quiet:
+      print response['access_token']
+    else:
+      print 'Access Token: %s' % response['access_token']
+      print 'Access Token Expiration Seconds: %s' % response['expires_in']
+  elif options.generate_oauth2_string:
+    RequireOptions(options, 'user', 'access_token')
+    oauth2_string = GenerateOAuth2String(options.user, options.access_token)
+    if options.quiet:
+      print oauth2_string
+    else:
+      print 'OAuth2 argument:\n' + oauth2_string
+  elif options.generate_oauth2_token:
+    RequireOptions(options, 'client_id', 'client_secret')
+    print 'To authorize token, visit this url and follow the directions:'
+    print '  %s' % GeneratePermissionUrl(options.client_id, options.scope)
+    authorization_code = raw_input('Enter verification code: ')
+    response = AuthorizeTokens(options.client_id, options.client_secret,
+                                authorization_code)
+    print 'Refresh Token: %s' % response['refresh_token']
+    print 'Access Token: %s' % response['access_token']
+    print 'Access Token Expiration Seconds: %s' % response['expires_in']
+  elif options.test_imap_authentication:
+    RequireOptions(options, 'user', 'access_token')
+    TestImapAuthentication(options.user,
+        GenerateOAuth2String(options.user, options.access_token,
+                             base64_encode=False))
+  elif options.test_smtp_authentication:
+    RequireOptions(options, 'user', 'access_token')
+    TestSmtpAuthentication(options.user,
+        GenerateOAuth2String(options.user, options.access_token,
+                             base64_encode=False))
+  else:
+    options_parser.print_help()
+    print 'Nothing to do, exiting.'
+    return
+
+if __name__ == '__main__':
+  main(sys.argv)
+```
+```open-webpage.py
+# open-webpage.py
+import urllib2
+url = 'http://www.oldbaileyonline.org/browse.jsp?id=t17800628-33&div=t17800628-33'
+response = urllib2.urlopen(url)
+webContent = response.read()
+print(webContent[0:300])
+```
+```osinfo.py
+# Script Name           : osinfo.py
+# Authors               : {'geekcomputers': 'Craig Richards', 'dmahugh': 'Doug Mahugh','rutvik1010':'Rutvik Narayana Nadimpally','y12uc231': 'Satyapriya Krishna', 'minto4644':'Mohit Kumar'}
+# Created               : 5th April 2012
+# Last Modified         : July 19 2016
+# Version               : 1.0
+# Modification 1        : Changed the profile to list again. Order is important. Everytime we run script we don't want to see different ordering.
+# Modification 2        : Fixed the AttributeError checking for all properties. Using hasttr().
+# Modification 3        : Removed ': ' from properties inside profile.
+
+# Description           : Displays some information about the OS you are running this script on
+import platform as pl
+profile = [
+        'architecture',
+        'linux_distribution',
+        'mac_ver',
+        'machine',
+        'node',
+        'platform',
+        'processor',
+        'python_build',
+        'python_compiler',
+        'python_version',
+        'release',
+        'system',
+        'uname',
+        'version',
+    ]
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+for key in profile:
+    if hasattr(pl, key):
+        print(key + bcolors.BOLD + ": " + str(getattr(pl, key)()) + bcolors.ENDC)
+```
+```python_3_email_with_attachment.py
+#!/usr/bin/env python
+# encoding: utf-8
+"""
+python_3_email_with_attachment.py
+Created by Robert Dempsey on 12/6/14.
+Copyright (c) 2014 Robert Dempsey. Use at your own peril.
+This script works with Python 3.x
+NOTE: replace values in ALL CAPS with your own values
+"""
+import os
+import smtplib
+from email import encoders
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+COMMASPACE = ', '
+def main():
+    sender = 'jones.developer@gmail.com'
+    gmail_password = 'dc71-.RU'
+    recipients = ['jones.chung@ztsystems.com']
+    # Create the enclosing (outer) message
+    outer = MIMEMultipart()
+    outer['Subject'] = 'attachement test'
+    outer['To'] = COMMASPACE.join(recipients)
+    outer['From'] = sender
+    outer.preamble = 'You will not see this in a MIME-aware mail reader.\n'
+    # List of attachments
+    attachments = ['duesRecords.xlsx']
+    # Add the attachments to the message
+    for file in attachments:
+        try:
+            with open(file, 'rb') as fp:
+                msg = MIMEBase('application', "octet-stream")
+                msg.set_payload(fp.read())
+            encoders.encode_base64(msg)
+            msg.add_header('Content-Disposition', 'attachment', filename=os.path.basename(file))
+            outer.attach(msg)
+        except:
+            print("Unable to open one of the attachments. Error: ", sys.exc_info()[0])
+            raise
+    composed = outer.as_string()
+    # Send the email
+    try:
+        with smtplib.SMTP('smtp.gmail.com', 587) as s:
+            s.ehlo()
+            s.starttls()
+            s.ehlo()
+            s.login(sender, gmail_password)
+            s.sendmail(sender, recipients, composed)
+            s.close()
+        print("Email sent!")
+    except:
+        print("Unable to send the email. Error: ", sys.exc_info()[0])
+        raise
+if __name__ == '__main__':
+    main()
+```
+```python_3_email_with_attachment_zt.py
+#!/usr/bin/env python
+# encoding: utf-8
+"""
+python_3_email_with_attachment.py
+Created by Robert Dempsey on 12/6/14.
+Copyright (c) 2014 Robert Dempsey. Use at your own peril.
+This script works with Python 3.x
+NOTE: replace values in ALL CAPS with your own values
+"""
+import os
+import smtplib
+from email import encoders
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+COMMASPACE = ', '
+def main():
+    sender = 'test@ztsystems.com'
+    gmail_password = '1978Morchaos'
+    recipients = ['jones.chung@ztsystems.com']
+    # Create the enclosing (outer) message
+    outer = MIMEMultipart()
+    outer['Subject'] = 'attachement test'
+    outer['To'] = COMMASPACE.join(recipients)
+    outer['From'] = sender
+    outer.preamble = 'You will not see this in a MIME-aware mail reader.\n'
+    # List of attachments
+    attachments = ['8MB']
+    # Add the attachments to the message
+    for file in attachments:
+        try:
+            with open(file, 'rb') as fp:
+                msg = MIMEBase('application', "octet-stream")
+                msg.set_payload(fp.read())
+            encoders.encode_base64(msg)
+            msg.add_header('Content-Disposition', 'attachment', filename=os.path.basename(file))
+            outer.attach(msg)
+        except:
+            print("Unable to open one of the attachments. Error: ", sys.exc_info()[0])
+            raise
+    composed = outer.as_string()
+    # Send the email
+    try:
+        with smtplib.SMTP('ztdcla-ex01.ztgroup.com', 25) as s:
+            s.ehlo()
+            s.starttls()
+            s.ehlo()
+            #s.login(sender, gmail_password)
+            s.sendmail(sender, recipients, composed)
+            s.close()
+        print("Email sent!")
+    except:
+        print("Unable to send the email. Error: ", sys.exc_info()[0])
+        raise
+if __name__ == '__main__':
+    main()
+```
+```readConfig.py
+import json
+from pprint import pprint
+def parseConfig(fileName):
+    with open(fileName, 'r') as fp:
+        obj = json.load(fp)
+    #pprint(obj)
+    return obj
+jsonObj = parseConfig("config.json")
+#pprint(jsonObj)
+print(jsonObj[0]["MY_EMAIL"])
+print(jsonObj[0]["BOT_EMAIL"])
+print(jsonObj[0]["BOT_EMAIL_PASSWORD"])
+print(jsonObj[0]["IMAP_SERVER"])
+print(jsonObj[0]["SMTP_SERVER"])
+print(jsonObj[0]["SMTP_PORT"])
+```
+```remove_empty_dir.py
+import sys
+import os
+#declare the root directory
+root_dir = 'C:\\temp\\'
+#initialize the counters
+empty_count = 0
+used_count = 0
+#Set the file to write to. 'x' will indicate to create a new file and open it for writing
+outfile = open('C:\\temp\\directories.txt', 'w')
+for curdir, subdirs, files in os.walk(sys.argv[1], topdown=False):
+    if len(subdirs) == 0 and len(files) == 0: #check for empty directories. len(files) == 0 may be overkill
+        empty_count += 1 #increment empty_count
+        print('Empty directory: {}'.format(curdir)) #add empty results to file
+        os.rmdir(curdir) #delete the directory
+    elif len(subdirs) > 0 and len(files) > 0: #check for used directories
+        used_count += 1 #increment used_count
+        print('Used directory: {}'.format(curdir)) #add used results to file
+#add the counters to the file
+print('empty_count: {}\nused_count: {}'.format(empty_count, used_count))
+outfile.close() #close the file
+```
+```save-webpage.py
+# save-webpage.py
+import urllib.request
+url = 'http://www.oldbaileyonline.org/browse.jsp?id=t17800628-33&div=t17800628-33'
+#response = urllib2.urlopen(url)
+request = urllib.request.Request(url)
+#webContent = response.read()
+response = urllib.request.urlopen(request)
+f = open('obo-t17800628-33.html', 'w')
+#f.write(webContent)
+f.write(response)
+f.close
+```
+```searchGoogle.py
+#!/usr/bin/python3
+from os import chdir
+import requests
+from bs4 import BeautifulSoup
+from urllib.request import urlopen, Request
+from urllib.parse import urlencode
+from os import walk
+import json
+from os.path import curdir
+from urllib.request import urlretrieve
+from os.path import pardir
+from create_dir import create_directory
+usr_agent = {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
+        'Accept-Encoding': 'none',
+        'Accept-Language': 'en-US,en;q=0.8',
+        'Connection': 'keep-alive'
+        }
+url = "https://www.googleapis.com/customsearch/v1?"
+print("What do you want to search for ? >> ")
+data = input()
+search_query = {'q': data}
+search = urlencode(search_query)
+print(search)
+g = url + search
+request = Request(g, headers=usr_agent)
+r = urlopen(request).read()
+data = json.loads ( r )
+print(data)
+results = data [ 'responseData' ] [ 'results' ]
+for result in results:
+    title = result['title']
+    url = result['url']
+    print ( title + '; ' + url )
+```
+```sendDuesReminders.py
+#! python3
+# sendDuesReminders.py - Sends emails based on their status in spreadsheet.
+import openpyxl, smtplib, sys
+# Open the spreadsheet and get the latest dues status.
+wb = openpyxl.load_workbook('duesRecords.xlsx')
+sheet = wb.get_sheet_by_name('Sheet1')
+lastCol = sheet.max_column
+latestMonth = sheet.cell(row=1, column=lastCol).value
+unpaidMembers = {}
+# Check each member's payment status
+for r in range(2, sheet.max_row + 1):
+    payment = sheet.cell(row=r, column=lastCol).value
+    if payment != 'paid':
+        name = sheet.cell(row=r, column=1).value
+        email = sheet.cell(row=r, column=2).value
+        unpaidMembers[name] = email
+# Log in to email account.
+smtpObj = smtplib.SMTP('smtp.gmail.com', 587)
+smtpObj.ehlo()
+smtpObj.starttls()
+smtpObj.login('jones.developer@gmail.com', sys.argv[1])
+# Send out reminder emails.
+for name, email in unpaidMembers.items():
+    body = 'Subject: %s dues unpaid.\nDear %s,\nRecords show that you have not paid dues for %s. Please make this payment as soon as possible. Thank you!' % (latestMonth, name, latestMonth)
+    print('Sending email to %s...' % email)
+    sendmailStatus = smtpObj.sendmail('jones.developer@gmail.com', email, body)
+    if sendmailStatus != {}:
+        print('There was a problem sending email to %s: %s' % (email, sendmailStatus))
+smtpObj.quit()
+```
+```sendDuesReminders2.py
+#! python3
+# sendDuesReminders.py - Sends emails based on their status in spreadsheet.
+import openpyxl, smtplib, sys
+# Open the spreadsheet and get the latest dues status.
+wb = openpyxl.load_workbook('ZTduesRecords.xlsx')
+#sheet = wb.get_sheet_by_name('Sheet1')
+sheet = wb['Sheet1']
+lastCol = sheet.max_column
+latestMonth = sheet.cell(row=1, column=lastCol).value
+unpaidMembers = {}
+# Check each member's payment status
+for r in range(2, sheet.max_row + 1):
+    payment = sheet.cell(row=r, column=lastCol).value
+    if payment != 'paid':
+        name = sheet.cell(row=r, column=1).value
+        email = sheet.cell(row=r, column=2).value
+        unpaidMembers[name] = email
+# Log in to email account.
+smtpObj = smtplib.SMTP('ztdcla-ex01.ztgroup.com', 25)
+smtpObj.ehlo()
+smtpObj.starttls()
+#smtpObj.login('jones.developer@gmail.com', sys.argv[1])
+# Send out reminder emails.
+for name, email in unpaidMembers.items():
+    body = 'Subject: %s dues unpaid.\nDear %s,\nRecords show that you have not paid dues for %s. Please make this payment as soon as possible. Thank you!' % (latestMonth, name, latestMonth)
+    print('Sending email to %s...' % email)
+    sendmailStatus = smtpObj.sendmail('TAOTrack@inventec.com', email, body)
+    if sendmailStatus != {}:
+        print('There was a problem sending email to %s: %s' % (email, sendmailStatus))
+smtpObj.quit()
+```
+```sendGmail.py
+"""The first step is to create an SMTP object, each object is used for connection
+with one server."""
+import os,sys,platform
+import smtplib
+def usage():
+    print("\nUsage: sendGmail.py <Password>")
+    return 0
+
+def send_email(user, pwd, recipient, subject, body):
+    import smtplib
+    FROM = user
+    TO = recipient if type(recipient) is list else [recipient]
+    SUBJECT = subject
+    TEXT = body
+    # Prepare actual message
+    message = """From: %s\nTo: %s\nSubject: %s\n\n%s
+    """ % (FROM, ", ".join(TO), SUBJECT, TEXT)
+    try:
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.ehlo()
+        server.starttls()
+        server.login(user, pwd)
+        server.sendmail(FROM, TO, message)
+        server.close()
+        print("successfully sent the mail")
+    except:
+        print("failed to send mail")
+def main():
+    ArgCount = len(sys.argv)
+    if ArgCount < 2 or ArgCount > 2:
+            print("\nInvalid Number of arguments")
+            usage()
+            return 1
+    ExecPath=os.getcwd()
+    pwd = str(sys.argv[1])
+    print("\nPassword: %s"%pwd)
+    #cmdoutput = subprocess.check_output(sourcecmd, shell=True)
+
+    user = "jones.developer"
+    recipient = "morchaos@gmail.com"
+    subject = "Hello World!"
+    body = "Greeting from Jones!"
+    send_email(user, pwd, recipient, subject, body)
+
+# This file is invoked from the python interpreter
+if __name__ == "__main__":
+        sys.exit(main())
+```
+```sendmail.py
+"""The first step is to create an SMTP object, each object is used for connection
+with one server."""
+import smtplib
+server = smtplib.SMTP('smtp.gmail.com', 587)
+server.starttls()
+#Next, log in to the server
+server.login("jones.developer", "dc71-.RU")
+#Send the mail
+msg = "Hello!" # The /n separates the message from the headers
+server.sendmail("jones.developer@gmail.com", "morchaos@gmail.com", msg)
+```
+```sendMIMEMail.py
+#!/usr/bin/env python
+"""Send the contents of a directory as a MIME message."""
+import os
+import sys
+import smtplib
+# For guessing MIME type based on file name extension
+import mimetypes
+from optparse import OptionParser
+from email import encoders
+from email.message import Message
+from email.mime.audio import MIMEAudio
+from email.mime.base import MIMEBase
+from email.mime.image import MIMEImage
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+COMMASPACE = ', '
+
+def main():
+    parser = OptionParser(usage="""\
+Send the contents of a directory as a MIME message.
+Usage: %prog [options]
+Unless the -o option is given, the email is sent by forwarding to your local
+SMTP server, which then does the normal delivery process.  Your local machine
+must be running an SMTP server.
+""")
+    parser.add_option('-d', '--directory',
+                      type='string', action='store',
+                      help="""Mail the contents of the specified directory,
+                      otherwise use the current directory.  Only the regular
+                      files in the directory are sent, and we don't recurse to
+                      subdirectories.""")
+    parser.add_option('-o', '--output',
+                      type='string', action='store', metavar='FILE',
+                      help="""Print the composed message to FILE instead of
+                      sending the message to the SMTP server.""")
+    parser.add_option('-s', '--sender',
+                      type='string', action='store', metavar='SENDER',
+                      help='The value of the From: header (required)')
+    parser.add_option('-r', '--recipient',
+                      type='string', action='append', metavar='RECIPIENT',
+                      default=[], dest='recipients',
+                      help='A To: header value (at least one required)')
+    opts, args = parser.parse_args()
+    if not opts.sender or not opts.recipients:
+        parser.print_help()
+        sys.exit(1)
+    directory = opts.directory
+    if not directory:
+        directory = '.'
+    # Create the enclosing (outer) message
+    outer = MIMEMultipart()
+    outer['Subject'] = 'Contents of directory %s' % os.path.abspath(directory)
+    outer['To'] = COMMASPACE.join(opts.recipients)
+    outer['From'] = opts.sender
+    outer.preamble = 'You will not see this in a MIME-aware mail reader.\n'
+    for filename in os.listdir(directory):
+        path = os.path.join(directory, filename)
+        if not os.path.isfile(path):
+            continue
+        # Guess the content type based on the file's extension.  Encoding
+        # will be ignored, although we should check for simple things like
+        # gzip'd or compressed files.
+        ctype, encoding = mimetypes.guess_type(path)
+        if ctype is None or encoding is not None:
+            # No guess could be made, or the file is encoded (compressed), so
+            # use a generic bag-of-bits type.
+            ctype = 'application/octet-stream'
+        maintype, subtype = ctype.split('/', 1)
+        if maintype == 'text':
+            fp = open(path)
+            # Note: we should handle calculating the charset
+            msg = MIMEText(fp.read(), _subtype=subtype)
+            fp.close()
+        elif maintype == 'image':
+            fp = open(path, 'rb')
+            msg = MIMEImage(fp.read(), _subtype=subtype)
+            fp.close()
+        elif maintype == 'audio':
+            fp = open(path, 'rb')
+            msg = MIMEAudio(fp.read(), _subtype=subtype)
+            fp.close()
+        else:
+            fp = open(path, 'rb')
+            msg = MIMEBase(maintype, subtype)
+            msg.set_payload(fp.read())
+            fp.close()
+            # Encode the payload using Base64
+            encoders.encode_base64(msg)
+        # Set the filename parameter
+        msg.add_header('Content-Disposition', 'attachment', filename=filename)
+        outer.attach(msg)
+    # Now send or store the message
+    composed = outer.as_string()
+    if opts.output:
+        fp = open(opts.output, 'w')
+        fp.write(composed)
+        fp.close()
+    else:
+        #s = smtplib.SMTP('localhost')
+        s = smtplib.SMTP('smtp.gmail.com', 587)
+        s.starttls()
+        #Next, log in to the server
+        s.login("jones.developer", "dc71-.RU")
+        s.sendmail(opts.sender, opts.recipients, composed)
+        s.quit()
+
+if __name__ == '__main__':
+    main()
+```
+```smtp_send.py
+# Import smtplib for the actual sending function
+import smtplib
+# For guessing MIME type
+import mimetypes
+# Import the email modules we'll need
+import email
+import email.mime.application
+# Create a text/plain message
+msg = email.mime.Multipart.MIMEMultipart()
+msg['Subject'] = 'Greetings'
+msg['From'] = 'xyz@gmail.com'
+msg['To'] = 'abc@gmail.com'
+# The main body is just another attachment
+body = email.mime.Text.MIMEText("""Hello, how are you? I am fine.
+This is a rather nice letter, don't you think?""")
+msg.attach(body)
+# PDF attachment
+filename='simple-table.pdf'
+fp=open(filename,'rb')
+att = email.mime.application.MIMEApplication(fp.read(),_subtype="pdf")
+fp.close()
+att.add_header('Content-Disposition','attachment',filename=filename)
+msg.attach(att)
+# send via Gmail server
+# NOTE: my ISP, Centurylink, seems to be automatically rewriting
+# port 25 packets to be port 587 and it is trashing port 587 packets.
+# So, I use the default port 25, but I authenticate.
+s = smtplib.SMTP('smtp.gmail.com')
+s.starttls()
+s.login('xyz@gmail.com','xyzpassword')
+s.sendmail('xyz@gmail.com',['xyz@gmail.com'], msg.as_string())
+s.quit()
+```
+```smtp_sent2.py
+import smtplib,email,email.encoders,email.mime.text,email.mime.base
+  smtpserver = 'localhost'
+  to = ['email@somewhere.com']
+  fromAddr = 'automated@hi.com'
+  subject = "my subject"
+  # create html email
+  html = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" '
+  html +='"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml">'
+  html +='<body style="font-size:12px;font-family:Verdana"><p>...</p>'
+  html += "</body></html>"
+  emailMsg = email.MIMEMultipart.MIMEMultipart('alternative')
+  emailMsg['Subject'] = subject
+  emailMsg['From'] = fromAddr
+  emailMsg['To'] = ', '.join(to)
+  emailMsg['Cc'] = ", ".join(cc)
+  emailMsg.attach(email.mime.text.MIMEText(html,'html'))
+  # now attach the file
+  fileMsg = email.mime.base.MIMEBase('application','vnd.ms-excel')
+  fileMsg.set_payload(file('exelFile.xls').read())
+  email.encoders.encode_base64(fileMsg)
+  fileMsg.add_header('Content-Disposition','attachment;filename=anExcelFile.xls')
+  emailMsg.attach(fileMsg)
+  # send email
+  server = smtplib.SMTP(smtpserver)
+  server.sendmail(fromAddr,to,emailMsg.as_string())
+  server.quit()
+```
+```smtp_sent3.py
+import smtplib,email,email.encoders,email.mime.text,email.mime.base
+from email.mime.multipart import MIMEMultipart
+smtpserver = 'ZTDCLA-EX01.ztgroup.com '
+to = ['jones.chung@ztsystems.com']
+fromAddr = 'test@example.com'
+subject = "my subject"
+cc = ''
+# create html email
+html = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" '
+html +='"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml">'
+html +='<body style="font-size:12px;font-family:Verdana"><p>...</p>'
+html += "</body></html>"
+emailMsg = MIMEMultipart('alternative')
+emailMsg['Subject'] = subject
+emailMsg['From'] = fromAddr
+emailMsg['To'] = ', '.join(to)
+emailMsg['Cc'] = ", ".join(cc)
+emailMsg.attach(email.mime.text.MIMEText(html,'html'))
+# now attach the file
+fileMsg = email.mime.base.MIMEBase('application','vnd.ms-excel')
+fileMsg.set_payload(open('exelFile.xls', 'rb').read())
+email.encoders.encode_base64(fileMsg)
+fileMsg.add_header('Content-Disposition','attachment;filename=anExcelFile.xls')
+emailMsg.attach(fileMsg)
+# send email
+server = smtplib.SMTP(smtpserver)
+server.sendmail(fromAddr,to,emailMsg.as_string())
+server.quit()
+```
+```tespeed.py
+#!/usr/bin/env python2
+#
+# Copyright 2012-2013 Janis Jansons (janis.jansons@janhouse.lv)
+#
+import argparse
+args=argparse.Namespace()
+args.suppress=None
+args.store=None
+from SocksiPy import socks
+import socket
+# Magic!
+def getaddrinfo(*args):
+    return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (args[0], args[1]))]
+socket.getaddrinfo = getaddrinfo
+socket.setdefaulttimeout(None)
+import urllib
+import urllib2
+import gzip
+import sys
+from multiprocessing import Process, Pipe, Manager
+from lxml import etree
+import time
+from math import radians, cos, sin, asin, sqrt
+from StringIO import StringIO
+# Using StringIO with callback to measure upload progress
+class CallbackStringIO(StringIO):
+    def __init__(self, num, th, d, buf = ''):
+        # Force self.buf to be a string or unicode
+        if not isinstance(buf, basestring):
+            buf = str(buf)
+        self.buf = buf
+        self.len = len(buf)
+        self.buflist = []
+        self.pos = 0
+        self.closed = False
+        self.softspace = 0
+        self.th=th
+        self.num=num
+        self.d=d
+        self.total=self.len*self.th
+    def read(self, n=10240):
+        next = StringIO.read(self, n)
+        #if 'done' in self.d:
+        #    return
+        self.d[self.num]=self.pos
+        down=0
+        for i in range(self.th):
+            down=down+self.d.get(i, 0)
+        if self.num==0:
+            percent = float(down) / (self.total)
+            percent = round(percent*100, 2)
+            print_debug("Uploaded %d of %d bytes (%0.2f%%) in %d threads\r" %
+               (down, self.total, percent, self.th))
+        #if down >= self.total:
+        #    print_debug('\n')
+        #    self.d['done']=1
+        return next
+    def __len__(self):
+        return self.len
+
+class TeSpeed:
+    def __init__(self, server = "", numTop = 0, servercount = 3, store = False, suppress = False, unit = False, chunksize=10240, downloadtests=15, uploadtests=10):
+        self.headers = {
+            'Accept' : 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'User-Agent' : 'Mozilla/5.0 (X11; Linux x86_64; rv:11.0) Gecko/20100101 Firefox/11.0',
+            'Accept-Language' : 'en-us,en;q=0.5',
+            'Connection' : 'keep-alive',
+            'Accept-Encoding' : 'gzip, deflate',
+            #'Referer' : 'http://c.speedtest.net/flash/speedtest.swf?v=301256',
+        }
+        self.num_servers=servercount;
+        self.servers=[]
+        if server != "":
+            self.servers=[server]
+        self.server=server
+        self.down_speed=-1
+        self.up_speed=-1
+        self.latencycount=10
+        self.bestServers=5
+        self.units="Mbit"
+        self.unit=0
+        self.chunksize=chunksize
+        self.downloadtests=downloadtests
+        self.uploadtests=uploadtests
+        if unit:
+            self.units="MiB"
+            self.unit=1
+        self.store=store
+        self.suppress=suppress
+        if store:
+            print_debug("Printing CSV formated results to STDOUT.\n")
+        self.numTop=int(numTop)
+        #~ self.downList=['350x350', '500x500', '750x750', '1000x1000',
+            #~ '1500x1500', '2000x2000', '2000x2000', '2500x2500', '3000x3000',
+            #~ '3500x3500', '4000x4000', '4000x4000', '4000x4000', '4000x4000']
+        #~ self.upSizes=[1024*256, 1024*256, 1024*512, 1024*512,
+            #~ 1024*1024, 1024*1024, 1024*1024*2, 1024*1024*2,
+            #~ 1024*1024*2, 1024*1024*2]
+        self.downList=[
+'350x350', '350x350', '500x500', '500x500', '750x750', '750x750', '1000x1000', '1500x1500', '2000x2000', '2500x2500',
+'3000x3000','3500x3500','4000x4000','1000x1000','1000x1000','1000x1000','1000x1000','1000x1000','1000x1000','1000x1000',
+'1000x1000','1000x1000','1000x1000','1000x1000','1000x1000','1000x1000','1000x1000','1000x1000','1000x1000','1000x1000',
+'2000x2000','2000x2000','2000x2000','2000x2000','2000x2000','2000x2000','2000x2000','2000x2000','2000x2000','2000x2000',
+'2000x2000','2000x2000','2000x2000','2000x2000','2000x2000','2000x2000','2000x2000','2000x2000','2000x2000','2000x2000',
+'4000x4000', '4000x4000', '4000x4000', '4000x4000', '4000x4000'
+]
+#'350x350', '500x500', '750x750', '1000x1000',
+#            '1500x1500', '2000x2000', '2000x2000', '2500x2500', '3000x3000',
+#            '3500x3500', '4000x4000', '4000x4000', '4000x4000', '4000x4000'
+#]
+        self.upSizes=[
+1024*256, 1024*256, 1024*512, 1024*512, 1024*1024, 1024*1024, 1024*1024*2, 1024*1024*2, 1024*1024*2,  1024*512,
+1024*256, 1024*256, 1024*256, 1024*256, 1024*256, 1024*256, 1024*256, 1024*256, 1024*256, 1024*256,
+1024*512, 1024*512, 1024*512, 1024*512, 1024*512, 1024*512, 1024*512, 1024*512, 1024*512, 1024*512,
+1024*512, 1024*512, 1024*512, 1024*512, 1024*512, 1024*512, 1024*512, 1024*512, 1024*512, 1024*512,
+1024*256, 1024*256, 1024*256, 1024*256, 1024*256, 1024*256, 1024*256, 1024*256, 1024*256, 1024*256,
+1024*512, 1024*512, 1024*512, 1024*512, 1024*512, 1024*512, 1024*512, 1024*512, 1024*512, 1024*512,
+1024*1024*2, 1024*1024*2, 1024*1024*2, 1024*1024*2,  1024*1024*2, 1024*1024*2, 1024*1024*2, 1024*1024*2, 1024*1024*2, 1024*1024*2,
+1024*1024*2, 1024*1024*2, 1024*1024*2, 1024*1024*2,  1024*1024*2, 1024*1024*2, 1024*1024*2, 1024*1024*2, 1024*1024*2, 1024*1024*2,
+#            1024*1024, 1024*1024, 1024*1024*2, 1024*1024*2,
+#            1024*1024*2, 1024*1024*2]
+]
+        self.postData=""
+        self.TestSpeed()
+
+    def Distance(self, one, two):
+    #Calculate the great circle distance between two points
+    #on the earth specified in decimal degrees (haversine formula)
+    #(http://stackoverflow.com/posts/4913653/revisions)
+    # convert decimal degrees to radians
+        lon1, lat1, lon2, lat2 = map(radians, [one[0], one[1], two[0], two[1]])
+        # haversine formula
+        dlon = lon2 - lon1
+        dlat = lat2 - lat1
+        a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+        c = 2 * asin(sqrt(a))
+        km = 6367 * c
+        return km
+
+    def Closest(self, center, points, num=5):
+    # Returns object that is closest to center
+        closest={}
+        for p in range(len(points)):
+            now = self.Distance(center, [points[p]['lat'], points[p]['lon']])
+            points[p]['distance']=now
+            while True:
+                if now in closest:
+                    now=now+00.1
+                else:
+                    break
+            closest[now]=points[p]
+        n=0
+        ret=[]
+        for key in sorted(closest):
+            ret.append(closest[key])
+            n+=1
+            if n >= num and num!=0:
+                break
+        return ret
+
+    def TestLatency(self, servers):
+    # Finding servers with lowest latency
+        print_debug("Testing latency...\n")
+        po = []
+        for server in servers:
+            now=self.TestSingleLatency(server['url']+"latency.txt?x=" + str( time.time() ))*1000
+            now=now/2 # Evil hack or just pure stupidity? Nobody knows...
+            if now == -1 or now == 0:
+                continue
+            print_debug("%0.0f ms latency for %s (%s, %s, %s) [%0.2f km]\n" %
+                (now, server['url'], server['sponsor'], server['name'], server['country'], server['distance']))
+            server['latency']=now
+            # Pick specified ammount of servers with best latency for testing
+            if int(len(po)) < int(self.num_servers):
+                po.append(server)
+            else:
+                largest = -1
+                for x in range(len(po)):
+                    if largest < 0:
+                        if now < po[x]['latency']:
+                            largest = x
+                    elif po[largest]['latency'] < po[x]['latency']:
+                        largest = x
+                    #if cur['latency']
+                if largest >= 0:
+                    po[largest]=server
+        return po
+
+    def TestSingleLatency(self, dest_addr):
+    # Checking latency for single server
+    # Does that by loading latency.txt (empty page)
+        request=self.GetRequest(dest_addr)
+        averagetime=0
+        total=0
+        for i in range(self.latencycount):
+            error=0
+            startTime = time.time()
+            try:
+                response = urllib2.urlopen(request, timeout = 5)
+            except (urllib2.URLError, socket.timeout), e:
+                error=1
+            if error==0:
+                averagetime = averagetime + (time.time() - startTime)
+                total=total+1
+            if total==0:
+                return False
+        return averagetime/total
+
+    def GetRequest(self, uri):
+    # Generates a GET request to be used with urlopen
+        req = urllib2.Request(uri, headers = self.headers)
+        return req
+
+    def PostRequest(self, uri, stream):
+    # Generate a POST request to be used with urlopen
+        req = urllib2.Request(uri, stream, headers = self.headers)
+        return req
+
+    def ChunkReport(self, bytes_so_far, chunk_size, total_size, num, th, d, w):
+    # Receiving status update from download thread
+        if w==1:
+            return
+        d[num]=bytes_so_far
+        down=0
+        for i in range(th):
+            down=down+d.get(i, 0)
+        if num==0 or down >= total_size*th:
+            percent = float(down) / (total_size*th)
+            percent = round(percent*100, 2)
+            print_debug("Downloaded %d of %d bytes (%0.2f%%) in %d threads\r" %
+               (down, total_size*th, percent, th))
+        #if down >= total_size*th:
+        #   print_debug('\n')
+
+    def ChunkRead(self, response, num, th, d, w=0, chunk_size=False, report_hook=None):
+        #print_debug("Thread num %d %d %d starting to report\n" % (th, num, d))
+        if not chunk_size:
+            chunk_size=self.chunksize
+        if(w==1):
+            return [0,0,0]
+        total_size = response.info().getheader('Content-Length').strip()
+        total_size = int(total_size)
+        bytes_so_far = 0
+        start=0
+        while 1:
+            chunk=0
+            if start == 0:
+                #print_debug("Started receiving data\n")
+                chunk = response.read(1)
+                start = time.time()
+            else:
+                chunk = response.read(chunk_size)
+            if not chunk:
+                break
+            bytes_so_far += len(chunk)
+            if report_hook:
+                report_hook(bytes_so_far, chunk_size, total_size, num, th, d, w)
+        end = time.time()
+        return [ bytes_so_far, start, end ]
+
+    def AsyncGet(self, conn, uri, num, th, d):
+        request=self.GetRequest(uri)
+        start=0
+        end=0
+        size=0
+        try:
+            response = urllib2.urlopen(request, timeout = 30);
+            size, start, end=self.ChunkRead(response, num, th, d, report_hook=self.ChunkReport)
+        #except urllib2.URLError, e:
+        #    print_debug("Failed downloading.\n")
+        except:
+            print_debug('                                                                                           \r')
+            print_debug("Failed downloading.\n")
+            conn.send([0, 0, False])
+            conn.close()
+            return
+        conn.send([size, start, end])
+        conn.close()
+
+    def AsyncPost(self, conn, uri, num, th, d):
+        postlen=len(self.postData)
+        stream = CallbackStringIO(num, th, d, self.postData)
+        request=self.PostRequest(uri, stream)
+        start=0
+        end=0
+        try:
+            response = urllib2.urlopen(request,  timeout = 30);
+            size, start, end=self.ChunkRead(response, num, th, d, 1, report_hook=self.ChunkReport)
+        #except urllib2.URLError, e:
+        #    print_debug("Failed uploading.\n")
+        except:
+            print_debug('                                                                                           \r')
+            print_debug("Failed uploading.\n")
+            conn.send([0, 0, False])
+            conn.close()
+            return
+        conn.send([postlen, start, end])
+        conn.close()
+
+    def LoadConfig(self):
+    # Load the configuration file
+        print_debug("Loading speedtest configuration...\n")
+        uri = "http://speedtest.net/speedtest-config.php?x=" + str( time.time() )
+        request=self.GetRequest(uri)
+        response = None
+        try:
+            response = urllib2.urlopen(request, timeout=5)
+        except (urllib2.URLError, socket.timeout), e:
+            print_debug("Failed to get Speedtest.net config file.\n")
+            print_result("%0.2f,%0.2f,\"%s\",\"%s\"\n" % (self.down_speed, self.up_speed, self.units, self.servers))
+            sys.exit(1)
+        # Load etree from XML data
+        config = etree.fromstring(self.DecompressResponse(response))
+        ip=config.find("client").attrib['ip']
+        isp=config.find("client").attrib['isp']
+        lat=float(config.find("client").attrib['lat'])
+        lon=float(config.find("client").attrib['lon'])
+        print_debug("IP: %s; Lat: %f; Lon: %f; ISP: %s\n" % (ip, lat, lon, isp))
+        return { 'ip': ip, 'lat': lat, 'lon': lon, 'isp': isp }
+
+    def LoadServers(self):
+    # Load server list
+        print_debug("Loading server list...\n")
+        uri = "http://speedtest.net/speedtest-servers.php?x=" + str( time.time() )
+        request=self.GetRequest(uri)
+        response=None
+        try:
+            response = urllib2.urlopen(request);
+        except (urllib2.URLError, socket.timeout), e:
+            print_debug("Failed to get Speedtest.net server list.\n")
+            print_result("%0.2f,%0.2f,\"%s\",\"%s\"\n" % (self.down_speed, self.up_speed, self.units, self.servers))
+            sys.exit(1)
+        # Load etree from XML data
+        servers_xml = etree.fromstring(response.read())
+        servers=servers_xml.find("servers").findall("server")
+        server_list=[]
+        for server in servers:
+            try:
+                server_list.append({
+                    'lat': float(server.attrib['lat']),
+                    'lon': float(server.attrib['lon']),
+                    'url': server.attrib['url'][:-10],
+                    'url2': server.attrib['url2'][:-10],
+                    'name': server.attrib['name'],
+                    'country': server.attrib['country'],
+                    'sponsor': server.attrib['sponsor'],
+                    'id': server.attrib['id'],
+                })
+            except:
+                server_list.append({
+                    'lat': float(server.attrib['lat']),
+                    'lon': float(server.attrib['lon']),
+                    'url': server.attrib['url'][:-10],
+                    'name': server.attrib['name'],
+                    'country': server.attrib['country'],
+                    'sponsor': server.attrib['sponsor'],
+                    'id': server.attrib['id'],
+                })
+        return server_list
+
+    def DecompressResponse(sefl, response):
+    # Decompress gzipped response
+        data = StringIO(response.read())
+        gzipper = gzip.GzipFile(fileobj=data)
+        try:
+            return gzipper.read()
+        except IOError as e:
+            # Response isn't gzipped, therefore return the data.
+            return data.getvalue()
+    def FindBestServer(self):
+        print_debug("Looking for closest and best server...\n")
+        best=self.TestLatency(self.Closest([self.config['lat'], self.config['lon']], self.server_list, self.bestServers))
+        for server in best:
+            self.servers.append(server['url'])
+    def AsyncRequest(self, url, num, upload=0):
+        connections=[]
+        d=Manager().dict()
+        start=time.time()
+        for i in range(num):
+            full_url=self.servers[i % len(self.servers)]+url
+            #print full_url
+            connection={}
+            connection['parent'], connection['child']= Pipe()
+            if upload==1:
+                connection['connection'] = Process(target=self.AsyncPost, args=(connection['child'], full_url, i, num, d))
+            else:
+                connection['connection'] = Process(target=self.AsyncGet, args=(connection['child'], full_url, i, num, d))
+            connection['connection'].start()
+            connections.append(connection)
+        for c in range(num):
+            connections[c]['size'], connections[c]['start'], connections[c]['end']=connections[c]['parent'].recv()
+            connections[c]['connection'].join()
+        end=time.time()
+        print_debug('                                                                                           \r')
+        sizes=0
+        #tspeed=0
+        for c in range(num):
+            if connections[c]['end'] is not False:
+                #tspeed=tspeed+(connections[c]['size']/(connections[c]['end']-connections[c]['start']))
+                sizes=sizes+connections[c]['size']
+                # Using more precise times for downloads
+                if upload==0:
+                    if c==0:
+                        start=connections[c]['start']
+                        end=connections[c]['end']
+                    else:
+                        if connections[c]['start'] < start:
+                            start=connections[c]['start']
+                        if connections[c]['end'] > end:
+                            end=connections[c]['end']
+        took=end-start
+        return [sizes, took]
+    def TestUpload(self):
+    # Testing upload speed
+        url="upload.php?x=" + str( time.time() )
+        sizes, took=[0,0]
+        counter=0
+        failures=0
+        data=""
+        for i in range(0, len(self.upSizes)):
+            if len(data) == 0 or self.upSizes[i] != self.upSizes[i-1]:
+                #print_debug("Generating new string to upload. Length: %d\n" % (self.upSizes[i]))
+                data=''.join("1" for x in xrange(self.upSizes[i]))
+            self.postData=urllib.urlencode({'upload6': data })
+            if i<2:
+                thrds=1
+            elif i<5:
+                thrds=2
+            elif i<7:
+                thrds=2
+            elif i<10:
+                thrds=3
+            elif i<25:
+                thrds=6
+            elif i<45:
+                thrds=4
+            elif i<65:
+                thrds=3
+            else:
+                thrds=2
+            sizes, took=self.AsyncRequest(url, thrds, 1)
+            #sizes, took=self.AsyncRequest(url, (i<4 and 1 or (i<6 and 2 or (i<6 and 4 or 8))), 1)
+            # Stop testing if too many failures
+            counter=counter+1
+            if sizes==0:
+                failures=failures+1
+                if failures>2:
+                    break
+                continue
+            size=self.SpeedConversion(sizes)
+            speed=size/took
+            print_debug("Upload size: %0.2f MiB; Uploaded in %0.2f s\n" %
+                (size, took))
+            print_debug("\033[92mUpload speed: %0.2f %s/s\033[0m\n" %
+                (speed, self.units))
+            if self.up_speed<speed:
+                self.up_speed=speed
+            if took>5 or counter>=self.uploadtests:
+                break
+        #print_debug("Upload size: %0.2f MiB; Uploaded in %0.2f s\n" % (self.SpeedConversion(sizes), took))
+        #print_debug("Upload speed: %0.2f MiB/s\n" % (self.SpeedConversion(sizes)/took))
+    def SpeedConversion(self, data):
+        if self.unit==1:
+            result=(float(data)/1024/1024)
+        else:
+            result=(float(data)/1024/1024)*1.048576*8
+        return result
+    def TestDownload(self):
+    # Testing download speed
+        sizes, took=[0,0]
+        counter=0
+        failures=0
+        for i in range(0, len(self.downList)):
+            url="random"+self.downList[i]+".jpg?x=" + str( time.time() ) + "&y=3"
+
+            if i<2:
+                thrds=1
+            elif i<5:
+                thrds=2
+            elif i<11:
+                thrds=2
+            elif i<13:
+                thrds=4
+            elif i<25:
+                thrds=2
+            elif i<45:
+                thrds=3
+            elif i<65:
+                thrds=2
+            else:
+                thrds=2
+            sizes, took=self.AsyncRequest(url, thrds )
+            #sizes, took=self.AsyncRequest(url, (i<1 and 2 or (i<6 and 4 or (i<10 and 6 or 8))) )
+            # Stop testing if too many failures
+            counter=counter+1
+            if sizes==0:
+                failures=failures+1
+                if failures>2:
+                    break
+                continue
+            size=self.SpeedConversion(sizes)
+            speed=size/took
+            print_debug("Download size: %0.2f MiB; Downloaded in %0.2f s\n" %
+                (size, took))
+            print_debug("\033[91mDownload speed: %0.2f %s/s\033[0m\n" %
+                (speed, self.units))
+            if self.down_speed<speed:
+                self.down_speed=speed
+            if took>5 or counter>=self.downloadtests:
+                break
+        #print_debug("Download size: %0.2f MiB; Downloaded in %0.2f s\n" % (self.SpeedConversion(sizes), took))
+        #print_debug("Download speed: %0.2f %s/s\n" % (self.SpeedConversion(sizes)/took, self.units))
+    def TestSpeed(self):
+        if self.server=='list-servers':
+            self.config=self.LoadConfig()
+            self.server_list=self.LoadServers()
+            self.ListServers(self.numTop)
+            return
+        if self.server == '':
+            self.config=self.LoadConfig()
+            self.server_list=self.LoadServers()
+            self.FindBestServer()
+        self.TestDownload()
+        self.TestUpload()
+        print_result("%0.2f,%0.2f,\"%s\",\"%s\"\n" % (self.down_speed, self.up_speed, self.units, self.servers))
+    def ListServers(self, num=0):
+        allSorted=self.Closest([self.config['lat'], self.config['lon']], self.server_list, num)
+        for i in range(0, len(allSorted)):
+            print_result("%s. %s (%s, %s, %s) [%0.2f km]\n" %
+                (i+1, allSorted[i]['url'], allSorted[i]['sponsor'], allSorted[i]['name'], allSorted[i]['country'], allSorted[i]['distance']))
+def print_debug(string):
+    if args.suppress!=True:
+        sys.stderr.write(string.encode('utf8'))
+    #return
+def print_result(string):
+    if args.store==True:
+        sys.stdout.write(string.encode('utf8'))
+    #return
+# Thx to Ryan Sears for http://bit.ly/17HhSli
+def set_proxy(typ=socks.PROXY_TYPE_SOCKS4, host="127.0.0.1", port=9050):
+    socks.setdefaultproxy(typ, host, port)
+    socket.socket = socks.socksocket
+def main(args):
+    if args.version:
+        print_debug("Tespeed v1.1\nNetwork speedtest using speedtest.net infrastructure - https://github.com/Janhouse/tespeed\n")
+        sys.exit(0)
+    if args.use_proxy:
+        if args.use_proxy==5:
+            set_proxy(typ=socks.PROXY_TYPE_SOCKS5, host=args.proxy_host, port=args.proxy_port)
+        else:
+            set_proxy(typ=socks.PROXY_TYPE_SOCKS4, host=args.proxy_host, port=args.proxy_port)
+    if args.listservers:
+        args.store=True
+    if args.listservers!=True and args.server=='' and args.store!=True:
+        print_debug("Getting ready. Use parameter -h or --help to see available features.\n")
+    else:
+        print_debug("Getting ready\n")
+    try:
+        t=TeSpeed(
+            args.listservers and 'list-servers' or args.server,
+            args.listservers, args.servercount,
+            args.store and True or False,
+            args.suppress and True or False,
+            args.unit and True or False,
+            chunksize=args.chunksize,
+            downloadtests=args.downloadtests,
+            uploadtests=args.uploadtests,
+        )
+    except (KeyboardInterrupt, SystemExit):
+        print_debug("\nTesting stopped.\n")
+        #raise
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='TeSpeed, CLI SpeedTest.net')
+    parser.add_argument('server', nargs='?', type=str, default='', help='Use the specified server for testing (skip checking for location and closest server).')
+    parser.add_argument('-ls', '--list-servers', dest='listservers', nargs='?', default=0, const=10, help='List the servers sorted by distance, nearest first. Optionally specify number of servers to show.')
+    parser.add_argument('-w', '--csv', dest='store', action='store_const', const=True, help='Print CSV formated output to STDOUT.')
+    parser.add_argument('-s', '--suppress', dest='suppress', action='store_const', const=True, help='Suppress debugging (STDERR) output.')
+    parser.add_argument('-mib', '--mebibit', dest='unit', action='store_const', const=True, help='Show results in mebibits.')
+    parser.add_argument('-n', '--server-count', dest='servercount', nargs='?', default=1, const=1, help='Specify how many different servers should be used in paralel. (Default: 1) (Increase it for >100Mbit testing.)')
+    parser.add_argument('-p', '--proxy', dest='use_proxy', type=int, nargs='?', const=4, help='Specify 4 or 5 to use SOCKS4 or SOCKS5 proxy.')
+    parser.add_argument('-ph', '--proxy-host', dest='proxy_host', type=str, nargs='?', default='127.0.0.1', help='Specify socks proxy host. (Default: 127.0.0.1)')
+    parser.add_argument('-pp', '--proxy-port', dest='proxy_port', type=int, nargs='?', default=9050, help='Specify socks proxy port. (Default: 9050)')
+    parser.add_argument('-cs', '--chunk-size', dest='chunksize', nargs='?', type=int, default=10240, help='Specify chunk size after wich tespeed calculates speed. Increase this number 4 or 5 times if you use weak hardware like RaspberryPi. (Default: 10240)')
+    parser.add_argument('-dt', '--max-download-tests', dest='downloadtests', nargs='?', type=int, default=15, help='Specify maximum number of download tests to be performed. (Default: 15)')
+    parser.add_argument('-ut', '--max-upload-tests', dest='uploadtests', nargs='?', type=int, default=10, help='Specify maximum number of upload tests to be performed. (Default: 10)')
+    #parser.add_argument('-i', '--interface', dest='interface', nargs='?', help='If specified, measures speed from data for the whole network interface.')
+    parser.add_argument('-v', '--version', dest='version', nargs='?', const=True, help='Show Tespeed version.')
+    args = parser.parse_args()
+    main(args)
+```
+```TorrentStarter041118.py
+#! python3
+# Checks for instructions via email and runs them.
+# So far, this program checks for BitTorrent "magnet" links and launches the torrent program for them.
+import smtplib, imapclient, pyzmail, logging, traceback, time, subprocess
+import json
+from pprint import pprint
+logging.basicConfig(filename='torrentStarterLog.txt', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+def parseConfig(fileName):
+    with open(fileName, 'r') as fp:
+        obj = json.load(fp)
+    #pprint(obj)
+    return obj
+jsonObj = parseConfig("config.json")
+MY_EMAIL = jsonObj[0]["MY_EMAIL"] # bot should only respond to me
+BOT_EMAIL = jsonObj[0]["BOT_EMAIL"]
+# TODO need a method to encrypt the password
+BOT_EMAIL_PASSWORD = jsonObj[0]["BOT_EMAIL_PASSWORD"]
+IMAP_SERVER = jsonObj[0]["IMAP_SERVER"]
+SMTP_SERVER = jsonObj[0]["SMTP_SERVER"]
+SMTP_PORT = jsonObj[0]["SMTP_PORT"]
+TORRENT_PROGRAM = jsonObj[0]["TORRENT_PROGRAM"]
+# Configure the program by setting some variables.
+# MY_EMAIL = 'morchaos@gmail.com' # bot should only respond to me
+# BOT_EMAIL = 'jones.autobot@gmail.com'
+# TODO need a method to encrypt the password
+# BOT_EMAIL_PASSWORD = '1978Morchaos'
+# IMAP_SERVER = 'imap.gmail.com'
+# SMTP_SERVER = 'smtp.gmail.com'
+# SMTP_PORT = 587
+#TORRENT_PROGRAM = 'C:\\qBittorrentPortable\\qbittorrent.exe'
+# TORRENT_PROGRAM = 'C:/qBittorrentPortable/qBittorrentPortable.exe'
+assert BOT_EMAIL != MY_EMAIL, "Give the bot it's own email address."
+
+def getInstructionEmails():
+    # Log in to the email imapCli.
+    logging.debug('Connecting to IMAP server at %s...' % (IMAP_SERVER))
+    imapCli = imapclient.IMAPClient(IMAP_SERVER, ssl=True)
+    imapCli.login(BOT_EMAIL, BOT_EMAIL_PASSWORD)
+    imapCli.select_folder('INBOX')
+    logging.debug('Connected.')
+    # Fetch all instruction emails.
+    instructions = []
+    #UIDs = imapCli.search(['FROM ' + MY_EMAIL])
+    UIDs = imapCli.search(['FROM', MY_EMAIL])
+    rawMessages = imapCli.fetch(UIDs, ['BODY[]'])
+    #rawMessages = imapCli.fetch(UIDs, [b'BODY[]'])
+    for UID in rawMessages.keys():
+        # Parse the raw email message.
+        message = pyzmail.PyzMessage.factory(rawMessages[UID][b'BODY[]'])
+        if message.html_part != None:
+            body = message.html_part.get_payload().decode(message.html_part.charset)
+        if message.text_part != None:
+            # If there's both an html and text part, use the text part.
+            body = message.text_part.get_payload().decode(message.text_part.charset)
+        # Extract instruction from email body.
+        instructions.append(body)
+    # Delete the instruction emails, if there are any.
+    if len(UIDs) > 0:
+        imapCli.delete_messages(UIDs)
+        imapCli.expunge()
+    imapCli.logout()
+    return instructions
+
+def parseInstructionEmail(instruction):
+    # Send an email response about the task.
+    responseBody = 'Subject: Instruction completed.\nInstruction received and completed.\nResponse:\n'
+    # Parse the email body to figure out the instruction.
+    lines = instruction.split('\n')
+    for line in lines:
+        if line.startswith('magnet:?'):
+            #subprocess.Popen(TORRENT_PROGRAM + ' ' + line) # launch the bittorrent program
+            subprocess.Popen(TORRENT_PROGRAM + ' ' + line) # launch the bittorrent program
+            responseBody += 'Downloading magnet link.\n'
+    # Email the response body to confirm the bot carried out this instruction.
+    logging.debug('Connecting to SMTP server at %s to send confirmation email...' % (SMTP_SERVER))
+    smtpCli = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)     # uncomment one or the other as needed.
+    #smtpCli = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) # uncomment one or the other as needed.
+    smtpCli.ehlo()
+    smtpCli.starttls() # comment this out if using SMTP_SSL
+    smtpCli.login(BOT_EMAIL, BOT_EMAIL_PASSWORD)
+    logging.debug('Connected.')
+    smtpCli.sendmail(BOT_EMAIL, MY_EMAIL, responseBody)
+    logging.debug('Confirmation email sent.')
+    smtpCli.quit()
+
+# Start an infinite loop that checks email and carries out instructions.
+print('Email bot started. Press Ctrl-C to quit.')
+logging.debug('Email bot started.')
+while True:
+    try:
+        logging.debug('Getting instructions from email...')
+        instructions = getInstructionEmails()
+        for instruction in instructions:
+            logging.debug('Doing instruction: ' + instruction)
+            parseInstructionEmail(instruction)
+    except Exception as err:
+        logging.error(traceback.format_exc())
+    # Wait 15 minutes before checking again
+    logging.debug('Done processing instructions. Pausing for 15 minutes.')
+    time.sleep(60 * 15)
+```
+```TorrentStarter041218.py
+#! python3
+# Checks for instructions via email and runs them.
+# So far, this program checks for BitTorrent "magnet" links and launches the torrent program for them.
+import smtplib, imapclient, pyzmail, logging, traceback, time, subprocess
+import json
+from pprint import pprint
+# Generate Logs with timestamp
+timeString = time.strftime("%Y%m%d%H%M%S")
+logging.basicConfig(filename='RPC' + timeString + '.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+#logging.basicConfig(filename='torrentStarterLog.txt', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+# JSON objects definition below
+# For BOT JSON object information definition, i.e bot mail address, servers information for accessing
+botObj = {"username": "jones.autobot@gmail.com",
+         "password": "1978Morchaos"}
+# For control side JSON object information definition, i.e remote mail address
+ctrlObj = {"username": "morchaos@gmail.com"}
+# For common servers JSON object information
+serverObj = {
+  "imap": "imap.gmail.com",
+  "smtp": "smtp.gmail.com",
+  "sport": 587}
+# For local JSON object configuration information, i.e timming, executable program
+configObj = {
+  "token": "magnet:?",
+  "program": "C:/qBittorrentPortable/qBittorrentPortable.exe",
+  "poll": 15}
+def parseConfig(fileName):
+    with open(fileName, 'r') as fp:
+        obj = json.load(fp)
+    #pprint(obj)
+    return obj
+# Load JSON file
+jsonObj = parseConfig("config.json")
+MY_EMAIL = jsonObj[0]["MY_EMAIL"] # bot should only respond to me
+BOT_EMAIL = jsonObj[0]["BOT_EMAIL"]
+# TODO need a method to encrypt the password
+BOT_EMAIL_PASSWORD = jsonObj[0]["BOT_EMAIL_PASSWORD"]
+IMAP_SERVER = jsonObj[0]["IMAP_SERVER"]
+SMTP_SERVER = jsonObj[0]["SMTP_SERVER"]
+SMTP_PORT = jsonObj[0]["SMTP_PORT"]
+TORRENT_PROGRAM = jsonObj[0]["TORRENT_PROGRAM"]
+# Configure the program by setting some variables.
+# MY_EMAIL = 'morchaos@gmail.com' # bot should only respond to me
+# BOT_EMAIL = 'jones.autobot@gmail.com'
+# TODO need a method to encrypt the password
+# BOT_EMAIL_PASSWORD = '1978Morchaos'
+# IMAP_SERVER = 'imap.gmail.com'
+# SMTP_SERVER = 'smtp.gmail.com'
+# SMTP_PORT = 587
+#TORRENT_PROGRAM = 'C:\\qBittorrentPortable\\qbittorrent.exe'
+# TORRENT_PROGRAM = 'C:/qBittorrentPortable/qBittorrentPortable.exe'
+assert BOT_EMAIL != MY_EMAIL, "Give the bot it's own email address."
+
+def getInstructionEmails():
+    # Log in to the email imapCli.
+    logging.debug('Connecting to IMAP server at %s...' % (IMAP_SERVER))
+    imapCli = imapclient.IMAPClient(IMAP_SERVER, ssl=True)
+    imapCli.login(BOT_EMAIL, BOT_EMAIL_PASSWORD)
+    imapCli.select_folder('INBOX')
+    logging.debug('Connected.')
+    # Fetch all instruction emails.
+    instructions = []
+    #UIDs = imapCli.search(['FROM ' + MY_EMAIL])
+    UIDs = imapCli.search(['FROM', MY_EMAIL])
+    rawMessages = imapCli.fetch(UIDs, ['BODY[]'])
+    #rawMessages = imapCli.fetch(UIDs, [b'BODY[]'])
+    for UID in rawMessages.keys():
+        # Parse the raw email message.
+        message = pyzmail.PyzMessage.factory(rawMessages[UID][b'BODY[]'])
+        if message.html_part != None:
+            body = message.html_part.get_payload().decode(message.html_part.charset)
+        if message.text_part != None:
+            # If there's both an html and text part, use the text part.
+            body = message.text_part.get_payload().decode(message.text_part.charset)
+        # Extract instruction from email body.
+        instructions.append(body)
+    # Delete the instruction emails, if there are any.
+    if len(UIDs) > 0:
+        imapCli.delete_messages(UIDs)
+        imapCli.expunge()
+    imapCli.logout()
+    return instructions
+
+def parseInstructionEmail(instruction):
+    # Send an email response about the task.
+    responseBody = 'Subject: Instruction completed.\nInstruction received and completed.\nResponse:\n'
+    # Parse the email body to figure out the instruction.
+    lines = instruction.split('\n')
+    for line in lines:
+        if line.startswith('magnet:?'):
+            #subprocess.Popen(TORRENT_PROGRAM + ' ' + line) # launch the bittorrent program
+            subprocess.Popen(TORRENT_PROGRAM + ' ' + line) # launch the bittorrent program
+            responseBody += 'Downloading magnet link.\n'
+    # Email the response body to confirm the bot carried out this instruction.
+    logging.debug('Connecting to SMTP server at %s to send confirmation email...' % (SMTP_SERVER))
+    smtpCli = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)     # uncomment one or the other as needed.
+    #smtpCli = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) # uncomment one or the other as needed.
+    smtpCli.ehlo()
+    smtpCli.starttls() # comment this out if using SMTP_SSL
+    smtpCli.login(BOT_EMAIL, BOT_EMAIL_PASSWORD)
+    logging.debug('Connected.')
+    smtpCli.sendmail(BOT_EMAIL, MY_EMAIL, responseBody)
+    logging.debug('Confirmation email sent.')
+    smtpCli.quit()
+
+# Start an infinite loop that checks email and carries out instructions.
+print('Email bot started. Press Ctrl-C to quit.')
+logging.debug('Email bot started.')
+while True:
+    try:
+        logging.debug('Getting instructions from email...')
+        instructions = getInstructionEmails()
+        for instruction in instructions:
+            logging.debug('Doing instruction: ' + instruction)
+            parseInstructionEmail(instruction)
+    except Exception as err:
+        logging.error(traceback.format_exc())
+    # Wait 15 minutes before checking again
+    logging.debug('Done processing instructions. Pausing for 15 minutes.')
+    time.sleep(60 * 15)
+```
+```TorrentStarter052518.py
+#! python3
+# Checks for instructions via email and runs them.
+# So far, this program checks for BitTorrent "magnet" links and launches the torrent program for them.
+import smtplib, imapclient, pyzmail, logging, traceback, time, subprocess
+import json
+from pprint import pprint
+# Generate Logs with timestamp
+timeString = time.strftime("%Y%m%d%H%M%S")
+logging.basicConfig(filename='RPC' + timeString + '.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+#logging.basicConfig(filename='torrentStarterLog.txt', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+# JSON objects definition below
+# For BOT JSON object information definition, i.e bot mail address, servers information for accessing
+botObj = {"username": "jones.autobot@gmail.com",
+         "password": "1978Morchaos"}
+# For control side JSON object information definition, i.e remote mail address
+ctrlObj = {"username": "morchaos@gmail.com"}
+# For common servers JSON object information
+serverObj = {
+  "imap": "imap.gmail.com",
+  "smtp": "smtp.gmail.com",
+  "sport": 587}
+# For local JSON object configuration information, i.e timming, executable program
+configObj = {
+  "token": "magnet:?",
+  "program": "D:/PortableApps/qBittorrentPortable/qBittorrentPortable.exe",
+  "poll": 15}
+def parseConfig(fileName):
+    with open(fileName, 'r') as fp:
+        obj = json.load(fp)
+    #pprint(obj)
+    return obj
+# Load JSON file
+jsonObj = parseConfig("config.json")
+MY_EMAIL = jsonObj[0]["MY_EMAIL"] # bot should only respond to me
+BOT_EMAIL = jsonObj[0]["BOT_EMAIL"]
+# TODO need a method to encrypt the password
+BOT_EMAIL_PASSWORD = jsonObj[0]["BOT_EMAIL_PASSWORD"]
+IMAP_SERVER = jsonObj[0]["IMAP_SERVER"]
+SMTP_SERVER = jsonObj[0]["SMTP_SERVER"]
+SMTP_PORT = jsonObj[0]["SMTP_PORT"]
+TORRENT_PROGRAM = jsonObj[0]["TORRENT_PROGRAM"]
+# Configure the program by setting some variables.
+# MY_EMAIL = 'morchaos@gmail.com' # bot should only respond to me
+# BOT_EMAIL = 'jones.autobot@gmail.com'
+# TODO need a method to encrypt the password
+# BOT_EMAIL_PASSWORD = '1978Morchaos'
+# IMAP_SERVER = 'imap.gmail.com'
+# SMTP_SERVER = 'smtp.gmail.com'
+# SMTP_PORT = 587
+#TORRENT_PROGRAM = 'C:\\qBittorrentPortable\\qbittorrent.exe'
+# TORRENT_PROGRAM = 'C:/qBittorrentPortable/qBittorrentPortable.exe'
+assert BOT_EMAIL != MY_EMAIL, "Give the bot it's own email address."
+
+def getInstructionEmails():
+    # Log in to the email imapCli.
+    logging.debug('Connecting to IMAP server at %s...' % (IMAP_SERVER))
+    imapCli = imapclient.IMAPClient(IMAP_SERVER, ssl=True)
+    imapCli.login(BOT_EMAIL, BOT_EMAIL_PASSWORD)
+    imapCli.select_folder('INBOX')
+    logging.debug('Connected.')
+    # Fetch all instruction emails.
+    instructions = []
+    #UIDs = imapCli.search(['FROM ' + MY_EMAIL])
+    UIDs = imapCli.search(['FROM', MY_EMAIL])
+    rawMessages = imapCli.fetch(UIDs, ['BODY[]'])
+    #rawMessages = imapCli.fetch(UIDs, [b'BODY[]'])
+    for UID in rawMessages.keys():
+        # Parse the raw email message.
+        message = pyzmail.PyzMessage.factory(rawMessages[UID][b'BODY[]'])
+        if message.html_part != None:
+            body = message.html_part.get_payload().decode(message.html_part.charset)
+        if message.text_part != None:
+            # If there's both an html and text part, use the text part.
+            body = message.text_part.get_payload().decode(message.text_part.charset)
+        # Extract instruction from email body.
+        instructions.append(body)
+    # Delete the instruction emails, if there are any.
+    if len(UIDs) > 0:
+        imapCli.delete_messages(UIDs)
+        imapCli.expunge()
+    imapCli.logout()
+    return instructions
+
+def parseInstructionEmail(instruction):
+    # Send an email response about the task.
+    responseBody = 'Subject: Instruction completed.\nInstruction received and completed.\nResponse:\n'
+    # Parse the email body to figure out the instruction.
+    lines = instruction.split('\n')
+    for line in lines:
+        if line.startswith('magnet:?'):
+            #subprocess.Popen(TORRENT_PROGRAM + ' ' + line) # launch the bittorrent program
+            subprocess.Popen(TORRENT_PROGRAM + ' ' + line) # launch the bittorrent program
+            responseBody += 'Downloading magnet link.\n'
+    # Email the response body to confirm the bot carried out this instruction.
+    logging.debug('Connecting to SMTP server at %s to send confirmation email...' % (SMTP_SERVER))
+    smtpCli = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)     # uncomment one or the other as needed.
+    #smtpCli = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) # uncomment one or the other as needed.
+    smtpCli.ehlo()
+    smtpCli.starttls() # comment this out if using SMTP_SSL
+    smtpCli.login(BOT_EMAIL, BOT_EMAIL_PASSWORD)
+    logging.debug('Connected.')
+    smtpCli.sendmail(BOT_EMAIL, MY_EMAIL, responseBody)
+    logging.debug('Confirmation email sent.')
+    smtpCli.quit()
+
+# Start an infinite loop that checks email and carries out instructions.
+print('Email bot started. Press Ctrl-C to quit.')
+logging.debug('Email bot started.')
+while True:
+    try:
+        logging.debug('Getting instructions from email...')
+        instructions = getInstructionEmails()
+        for instruction in instructions:
+            logging.debug('Doing instruction: ' + instruction)
+            parseInstructionEmail(instruction)
+    except Exception as err:
+        logging.error(traceback.format_exc())
+    # Wait 15 minutes before checking again
+    logging.debug('Done processing instructions. Pausing for 15 minutes.')
+    time.sleep(60 * 15)
+```
+```twitter.py
+"""
+Author: Shreyas Daniel (shreydan)
+Install: tweepy - "pip install tweepy"
+API: Create a twitter app "apps.twitter.com" to get your OAuth requirements.
+Version: 1.0
+Tweet text and pics directly from the terminal.
+"""
+import tweepy, os
+def getStatus():
+    lines = []
+    while True:
+        line = raw_input()
+        if line:
+            lines.append(line)
+        else:
+            break
+    status = '\n'.join(lines)
+    return status
+def tweetthis(type):
+        if type == "text":
+                print "Enter your tweet "+user.name
+                tweet = getStatus()
+                try:
+                        api.update_status(tweet)
+                except Exception as e:
+                        print e
+                        return
+        elif type == "pic":
+                print "Enter pic path "+user.name
+                pic = os.path.abspath(raw_input())
+                print "Enter status "+user.name
+                title = getStatus()
+                try:
+                        api.update_with_media(pic, status=title)
+                except Exception as e:
+                        print e
+                        return
+        print "\n\nDONE!!"
+def initialize():
+        global api, auth, user
+        ck = "here" # consumer key
+        cks = "here" # consumer key SECRET
+        at = "here" # access token
+        ats = "here" # access token SECRET
+        auth = tweepy.OAuthHandler(ck,cks)
+        auth.set_access_token(at,ats)
+        api = tweepy.API(auth)
+        user = api.me()
+def main():
+        doit = int(raw_input("\n1. text\n2. picture\n"))
+        initialize()
+        if doit == 1:
+                tweetthis("text")
+        elif doit == 2:
+                tweetthis("pic")
+        else:
+                print "OK, Let's try again!"
+                main()
+main()
+```
+```WalkDirFile.py
+import os
+for folderName, subfolders, filenames in os.walk('.'):
+    print('the current folder is' + folderName)
+    for subfolder in subfolders:
+        print('SUBFOLDER OF' + folderName + ': ' + subfolder)
+        for filename in filenames:
+            print('FILE INSIDE' + folderName +': ' + filename)
+        print(' ')
+```
+```websiteDownloader.py
+#!/usr/bin/python3
+from os import chdir
+import requests
+from bs4 import BeautifulSoup
+from urllib.request import urlopen, Request
+from urllib.parse import urlencode
+from urllib.request import urlopen
+import urlparse
+import urllib2
+from os import walk
+import json
+from os.path import curdir
+from urllib.request import urlretrieve
+from os.path import pardir
+from create_dir import create_directory
+TARGET_WEBSITE = 'https://livedemo00.template-help.com/wt_58563_v2/index.html'
+USER_AGENT = {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
+        'Accept-Encoding': 'none',
+        'Accept-Language': 'en-US,en;q=0.8',
+        'Connection': 'keep-alive'
+        }
+i=0
+request = Request(TARGET_WEBSITE, headers=USER_AGENT)
+response = urlopen(request).read()
+beautifulReturn = BeautifulSoup(response, 'html.parser')
+print(beautifulReturn)
+results = beautifulReturn.findAll('a', href=True)
+print(results)
+results = beautifulReturn.findAll('a',{'href'})
+print(results)
+```
+```youtube.py
+'''
+Author: Abhinav Anand
+git: github.com/ab-anand
+mail: abhinavanand1905@gmail.com
+Requirements: requests, BeautifulSoup
+'''
+import os
+import webbrowser
+import requests
+from bs4 import BeautifulSoup
+'''
+headers = {
+    'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36'}
+'''
+query = input('Enter the song to be played: ')
+query = query.replace(' ', '+')
+# search for the best similar matching video
+url = 'https://www.youtube.com/results?search_query=' + query
+source_code = requests.get(url,timeout=15)
+plain_text = source_code.text
+soup = BeautifulSoup(plain_text, "html.parser")
+# fetches the url of the video
+songs = soup.findAll('div', {'class': 'yt-lockup-video'})
+song = songs[0].contents[0].contents[0].contents[0]
+link = song['href']
+webbrowser.open('https://www.youtube.com' + link)
+#hey i'm learning  git.
+```
+```youtubeDownloader.py
+#!/usr/bin/python
+from bs4 import BeautifulSoup
+import time
+import requests
+import re
+import os
+import subprocess
+YoutubeUrl = 'https://youtube.com'
+KEY = '?'
+def get_videolist(dom, date):
+    soup = BeautifulSoup(dom, 'html.parser')
+    #print(soup)
+#<div class="compact-media-item"><a class="compact-media-item-image" aria-hidden="true" href="/watch?v=RBQllqvijdo"><div class="video-thumbnail-container-compact center"><div class="cover video-thumbnail-img video-thumbnail-bg"></div><img alt="" class="cover video-thumbnail-img" src="https://i.ytimg.com/vi_webp/RBQllqvijdo/mqdefault.webp"><div class="video-thumbnail-overlay-bottom-group"><ytm-thumbnail-overlay-time-status-renderer data-style="DEFAULT"><span aria-label="3 minutes, 54 seconds">3:54</span></ytm-thumbnail-overlay-time-status-renderer></div></div></a><div class="compact-media-item-metadata" data-has-badges="false"><a class="compact-media-item-metadata-content" href="/watch?v=RBQllqvijdo"><h4 class="compact-media-item-headline"><span aria-label="190521 걸크러쉬(Girl Crush) 7 rings+Swalla 트월킹/twerking 보미(BOMI) 직캠/fancam @ 원주 한라대 축제 by hoyasama by hoya sama 3 months ago 3 minutes, 54 seconds 4,040,444 views">190521 걸크러쉬(Girl Crush) 7 rings+Swalla 트월킹/twerking 보미(BOMI) 직캠/fancam @ 원주 한라대 축제 by hoyasama</span></h4><div class="subhead" aria-hidden="true"><div class="compact-media-item-byline small-text">hoya sama</div><div class="compact-media-item-stats small-text">4M views</div></div></a><ytm-menu-renderer class="compact-media-item-menu"><ytm-menu><button class="icon-button " aria-label="Action menu" aria-haspopup="true"><c3-icon flip-for-rtl="false"><svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" fill=""><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path></svg></c3-icon></button></ytm-menu></ytm-menu-renderer></div></div>
+    videolist = []
+    divs = soup.find_all('a',{'class':'compact-media-item'})
+    for d in divs:
+        if d.find('a'):  # 有超連結，表示文章存在，未被刪除
+            href = d.find('a')['href']
+            # Todo: to find the video-ttle
+            #title = d.find('a').text
+            print(href)
+            videolist.append({
+                'name': 'Todo',
+                'url': href
+            })
+    return videolist
+
+def get_web_page(url):
+    resp = requests.get(
+        url=url,
+        cookies={'over18': '1'}
+    )
+    if resp.status_code != 200:
+        print('Invalid url:', resp.url)
+        return None
+    else:
+        return resp.text
+
+def get_downloadable_address(dom):
+    soup = BeautifulSoup(dom, 'html.parser')
+    #print(soup)
+    game_href = soup.find_all(text=re.compile('const game_url='))
+    game_url = str(game_href)
+    url = game_url.split('"')[1]
+    #print(url)
+    return url
+page = get_web_page(YoutubeUrl + '/watch?v=MTgGo0E7B9g')
+if page:
+    date = time.strftime("%m/%d").lstrip('0')
+    current_videolist = get_videolist(page, date)
+    for video in current_videolist:
+        print(video)
+        #link = get_downloadable_address(get_web_page(game['url']))
+        #filename = link.split('/')[5]
+        #print("the file is " + filename)
+        #if os.path.exists(filename):
+         #   print(filename + " downloaded!")
+        #else:
+            #myfile = requests.get(link, allow_redirects=True)
+            #slugify(game['name'])
+            #open(game['name'],'wb').write(myfile.content)
+            #subprocess.call(["wget", link])
+            #print("downloading")
+
+        #print(get_web_page(game['url']))
+```
+```youtubePlaylist.py
+from bs4 import BeautifulSoup as bs
+import requests
+r = requests.get('https://youtu.be/ETAl4so3Ako?list=RDETAl4so3Ako')
+page = r.text
+soup=bs(page,'html.parser')
+print(soup)
+res=soup.find_all('link')
+for l in res:
+    print( l.get("href"))
+```
+```youtube_agent.py
+'''
+Author: Abhinav Anand
+git: github.com/ab-anand
+mail: abhinavanand1905@gmail.com
+Requirements: requests, BeautifulSoup
+'''
+import os
+import webbrowser
+import requests
+from bs4 import BeautifulSoup
+'''
+headers = {
+    'user-agent': '
+Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36 Edge/16.16299 Netscape (Win32)'}
+'''
+query = input('Enter the song to be played: ')
+query = query.replace(' ', '+')
+# search for the best similar matching video
+url = 'https://www.youtube.com/results?search_query=' + query
+source_code = requests.get(url,timeout=15)
+plain_text = source_code.text
+soup = BeautifulSoup(plain_text, "html.parser")
+# fetches the url of the video
+songs = soup.findAll('div', {'class': 'yt-lockup-video'})
+song = songs[0].contents[0].contents[0].contents[0]
+link = song['href']
+webbrowser.open('https://www.youtube.com' + link)
+#hey i'm learning  git.
+```
+```youtube_downloader.py
+# Script Created by Yash Ladha
+# Requirements:
+#   youtube-dl
+#   aria2c
+# 10 Feb 2017
+import subprocess
+import sys
+video_link, threads = sys.argv[1], sys.argv[2]
+subprocess.call([
+    "youtube-dl",
+    video_link,
+    "--external-downloader",
+    "aria2c",
+    "--external-downloader-args",
+    "-x"+threads
+])
+```
+````

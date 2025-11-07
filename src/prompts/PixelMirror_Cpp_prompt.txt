@@ -1,0 +1,92 @@
+### **Software Name:** PixelMirror
+
+### **Platform:** Android (Targeting Android 13+ via Android NDK)  
+Optional desktop components for Windows/Linux built with cross-platform C++ libraries (e.g., SDL2, Qt, or raw Win32/X11 APIs).
+
+### **Core Functionality:**  
+Real-time desktop mirroring from a PC to an Android device, implemented in C++ for maximum performance, low-level control over memory and threading, and minimal latency. Designed for direct framebuffer manipulation, efficient socket communication, and hardware-accelerated rendering.
+
+---
+
+### **I. User Interface (UI) & User Experience (UX):**
+
+> UI layer may use Java/Kotlin for Android integration, but all core logic, rendering, and networking are implemented in C++ via JNI and Android NDK.
+
+- **Main Screen:**
+  - **Mirroring Mode Toggle:** Calls into C++ backend to switch between raw framebuffer mirroring and basic display mode.
+  - **Resolution Selection:** Dropdown triggers C++ routines to adjust encoding resolution and scaling.
+  - **Latency Indicator:** Updated via C++ timing metrics using `std::chrono` or `clock_gettime`.
+  - **Connection Status:** C++ socket layer reports IP and connection state to UI via JNI.
+  - **Settings Icon:** Opens configuration panel (UI-driven, backed by C++ config structs).
+
+- **Settings Panel:**
+  - **Network Type:** C++ backend detects available interfaces using `getifaddrs`, `ioctl`, or Android NDK APIs.
+  - **Static IP Configuration:** C++ routines apply IP settings via low-level socket APIs.
+  - **Latency Optimization:** Toggles compression flags in C++ encoder module.
+  - **Audio Output Selection:** C++ backend selects and routes audio streams using Android NDK audio APIs or OpenSL ES.
+  - **Color Calibration (Beta):** Optional integration with C++ libraries like LittleCMS or custom matrix transforms.
+
+- **Touchscreen Controls:**  
+  Android input events passed to C++ handlers for gesture interpretation and PC control packet generation.
+
+---
+
+### **II. Technical Specifications & Features (C++ Implementation Focus):**
+
+- **Remote Display Protocol:**  
+  Custom protocol implemented in C++ using raw TCP/UDP sockets (`recv`, `send`, `select`, `poll`). Optionally wraps RDP or raw framebuffer streaming.
+
+- **Network Connection:**
+  - **Wi-Fi:** C++ code uses Android NDK’s `libwifi-hal` or raw socket scanning.
+  - **Ethernet:** Interface enumeration and socket binding via `ioctl` and `getifaddrs`.
+
+- **Audio Streaming:**  
+  RTP implemented in C++ using raw UDP sockets. Bluetooth audio routed via OpenSL ES or AAudio.
+
+- **Data Compression:**  
+  Lossy compression via C++ libraries (e.g., libjpeg-turbo, zstd). Aggressive mode toggles quantization and downsampling.
+
+- **Latency Reduction:**  
+  Jitter buffer and packet loss compensation using C++ circular buffers and adaptive retransmission logic.
+
+- **Error Handling:**  
+  All socket, memory, and thread operations wrapped with robust error checks (`errno`, `strerror`, custom logging macros).
+
+- **Security:**  
+  Lightweight encryption via C++ libraries (e.g., OpenSSL, libsodium), applied to control and data channels.
+
+---
+
+### **III. Development & Future Enhancements (C++ Roadmap):**
+
+- **Technology Stack:**
+  - **Core:** C++17 or later, POSIX threads, raw sockets, framebuffer encoding
+  - **Android Integration:** JNI bridge to Kotlin UI
+  - **Display Protocol:** Custom C++ protocol or RDP client/server
+
+- **Future Features:**
+  - **Multi-Window Mirroring:** C++ window capture and multiplexing
+  - **HDR Support:** C++ routines for HDR metadata parsing and tone mapping
+  - **Advanced Latency Optimization:** Implement DPMS and adaptive frame pacing in C++
+  - **Customizable Keyboard Shortcuts:** C++ input mapping and serialization
+
+---
+
+### **IV. User Permissions (Android Manifest):**
+
+- Network Access (for C++ socket layer)
+- Microphone (for audio feedback via C++ audio capture)
+- Display Over Android (for rendering mirrored frames via C++ buffer)
+
+---
+
+### **Key Considerations for PixelMirror (C++ Implementation):**
+
+- **Low Latency is Paramount:**  
+  C++ enables fine-grained control over memory, threads, and I/O for minimal latency.
+
+- **User-Friendly Design:**  
+  UI remains intuitive, but all backend logic is optimized in C++ for performance.
+
+- **Robust Error Handling:**  
+  C++ modules include detailed logging, fallback routines, and recovery mechanisms.

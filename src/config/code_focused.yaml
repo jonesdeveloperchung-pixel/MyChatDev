@@ -1,0 +1,34 @@
+
+# Code-Focused Profile: Using models specifically fine-tuned for coding tasks.
+product_manager:
+  model_id: "deepseek-coder:6.7b"
+  temperature: 0.3
+  max_tokens: 8192
+architect:
+  model_id: "deepseek-coder:6.7b"
+  temperature: 0.2
+  max_tokens: 8192
+programmer:
+  model_id: "qwen3-coder:30b"
+  temperature: 0.1
+  max_tokens: 16384
+tester:
+  model_id: "deepseek-coder:6.7b"
+  temperature: 0.2
+  max_tokens: 8192
+reviewer:
+  model_id: "codegemma:latest"
+  temperature: 0.3
+  max_tokens: 8192
+distiller:
+  model_id: "deepseek-coder:1.3b"
+  temperature: 0.2
+  max_tokens: 4096
+reflector:
+  model_id: "deepseek-coder:6.7b"
+  temperature: 0.2
+  max_tokens: 8192
+quality_gate:
+  model_id: "deepseek-coder:6.7b"
+  temperature: 0.1
+  max_tokens: 8192

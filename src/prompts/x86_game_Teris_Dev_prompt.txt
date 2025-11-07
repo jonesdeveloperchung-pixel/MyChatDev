@@ -1,0 +1,94 @@
+# 🎮 Bare‑Metal Tetris Development Specification
+
+**Design and implement a bootable, bare‑metal Tetris game for x86 architecture, without relying on any operating system, third‑party components, or external libraries. Programming languages are unrestricted (Assembly, C, Rust, or others may be used). The system must include:**
+
+1. **Custom bootloader** written in Assembly, loaded via BIOS MBR, which sets up protected mode, initializes segment registers, and transfers control to the game kernel.  
+2. **Direct hardware initialization** of VGA or framebuffer graphics mode using BIOS interrupts or manual register programming, with no OS or driver dependencies.  
+3. **Minimal graphics subsystem** capable of drawing:  
+   - Static background (playfield grid)  
+   - Tetromino blocks in different colors/shapes  
+   - Score and level text using a fixed‑width bitmap font  
+   - A centered splash string (e.g., “TETRIS”) at startup  
+4. **Input handling** via direct polling of PS/2 keyboard or USB (if implemented), mapping keys to:  
+   - Move left/right  
+   - Rotate piece  
+   - Soft drop / hard drop  
+   - Pause/quit  
+5. **Game loop** implemented as a cooperative scheduler:  
+   - Piece spawning, falling, and collision detection with playfield  
+   - Line clearing and score updates  
+   - Level progression with increasing fall speed  
+   - Frame timing controlled via PIT (Programmable Interval Timer) or CPU cycle delays for consistent gameplay speed  
+6. **Lightweight diagnostics/logging** optionally routed to serial port or onscreen overlay for debugging, compiled conditionally.  
+7. **Build system** supporting reproducible cross‑compilation, with QEMU/Bochs emulation targets and optional ISO image generation for bootable media.  
+
+**The Tetris system must be self‑contained, bootable directly from BIOS, and under 64KB total binary size. Documentation should include onboarding notes, annotated source, and reproducible build instructions for contributors.**
+
+---
+
+# 🕹️ Bare‑Metal Tetris: Role–Phase Breakdown
+
+## 1. **Bootloader Phase (Assembly Lead)**
+**Role:** Low‑level systems engineer  
+**Responsibilities:**
+- Write custom MBR boot sector (≤512 bytes).  
+- Switch CPU from real → protected mode.  
+- Set up GDT and stack.  
+- Load kernel into memory and jump to entry point.  
+
+**Deliverables:**  
+- `boot.asm` with annotated source.  
+- Verified boot into protected mode under QEMU/Bochs.  
+
+---
+
+## 2. **Graphics Init Phase (Graphics/Framebuffer Engineer)**
+**Role:** Graphics subsystem developer  
+**Responsibilities:**
+- Initialize VGA mode 13h (320×200, 256 colors) or linear framebuffer.  
+- Provide primitive drawing routines:  
+  - `draw_rect()` for tetromino blocks  
+  - `draw_grid()` for playfield  
+  - `draw_text()` for score/level  
+- Render splash screen “TETRIS” at startup.  
+
+**Deliverables:**  
+- `gfx.c` or `gfx.rs` with minimal API.  
+- Verified rendering of grid + blocks.  
+
+---
+
+## 3. **Input Phase (Input/Device Engineer)**
+**Role:** Input handler developer  
+**Responsibilities:**
+- Poll PS/2 keyboard controller via I/O ports (0x60, 0x64).  
+- Map keys to Tetris controls (←, →, ↑, ↓, space, P).  
+- Handle key repeat and debounce.  
+
+**Deliverables:**  
+- `input.c` or `input.rs` with `get_key_state()` API.  
+- Verified paddle/rotation movement in test harness.  
+
+---
+
+## 4. **Game Loop Phase (Gameplay/Logic Engineer)**
+**Role:** Game logic developer  
+**Responsibilities:**
+- Implement main loop with frame timing.  
+- Spawn tetrominoes, apply gravity, detect collisions.  
+- Handle line clears, scoring, and level progression.  
+- Redraw playfield and score each frame.  
+- Detect game over condition.  
+
+**Deliverables:**  
+- `game.c` or `game.rs` with `main_loop()`.  
+- Verified gameplay: pieces fall, rotate, lines clear, score updates.  
+- Optional debug overlay via serial.  
+
+---
+
+# 🔄 Integration & Traceability
+- **Bootloader → Kernel handoff**: entry point + stack pointer.  
+- **Graphics API** consumed by Game Loop.  
+- **Input API** consumed by Game Loop.  
+- **Game Loop** drives redraw + input polling + collision detection + scoring.  

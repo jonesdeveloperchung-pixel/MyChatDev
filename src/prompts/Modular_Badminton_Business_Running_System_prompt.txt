@@ -1,0 +1,167 @@
+## 🏸 Modular Badminton Business Running System
+
+A cross-platform, extensible system supporting GUI and headless execution. It manages court rentals, player scoring, badminton-ware shopping, and equipment maintenance with telemetry-ready outputs and onboarding-friendly documentation.
+
+---
+
+### 1. 🎛️ Interactive Input Interface
+
+Supports user-defined inputs across modules:
+
+#### a. Court Reservation
+- Date/time, duration, court type (indoor/outdoor)
+- Player count, skill level, preferred lighting/flooring
+- Payment method, membership status
+
+#### b. Match Setup
+- Player profiles (name, age, skill rating)
+- Match type (singles/doubles), scoring rules (21-point, rally scoring)
+- Referee assignment, live scoreboard toggle
+
+#### c. Shopping & Maintenance
+- Product filters (rackets, shoes, shuttlecocks, apparel)
+- Equipment condition reports (wear level, string tension, grip status)
+- Maintenance scheduling (auto-reminders, technician assignment)
+
+---
+
+### 2. ⚙️ Automated Computation Engine
+
+Handles real-time calculations and business logic:
+
+#### a. Reservation Engine
+- Conflict detection, dynamic pricing (peak/off-peak)
+- Loyalty discounts, refund policies, waitlist prioritization
+
+#### b. Scoring Engine
+- Live score tracking with undo/redo
+- Player stats aggregation (win/loss ratio, average rally length)
+- Match history export (JSON, CSV)
+
+#### c. Inventory & Maintenance Engine
+- Stock level monitoring, reorder triggers
+- Equipment lifecycle tracking (usage hours, last maintenance)
+- Predictive maintenance alerts based on wear models
+
+---
+
+### 3. 🧩 Modular Solver Architecture
+
+Inspired by analytical/empirical modeling:
+
+#### a. Reservation Solver
+- Optimizes court allocation using time-slot packing and player clustering
+
+#### b. Scoring Solver
+- Validates scoring against official rulesets (BWF compliance)
+- Supports custom rule modules (e.g., training drills, mini-games)
+
+#### c. Maintenance Solver
+- Uses empirical wear models to estimate next service date
+- Matches technician availability with equipment needs
+
+---
+
+### 4. 📡 Telemetry-Ready Output Layer
+
+Structured exports and visualizations:
+
+- Reservation logs, player stats, match summaries
+- Inventory turnover charts, maintenance schedules
+- JSON/CSV exports for integration with ERP/CRM systems
+- Optional dashboards: court utilization heatmaps, player performance graphs
+
+---
+
+### 5. 📚 Onboarding-Friendly Documentation
+
+Includes:
+
+- Embedded design rationale for each module
+- Compliance notes (e.g., BWF rules, local safety standards)
+- Reproducible workflows for match setup, scoring, and maintenance
+- Role-specific onboarding guides (admin, referee, technician, shopkeeper)
+
+---
+
+### 6. 🧪 Production-Ready Engineering
+
+- ✅ Unit-tested modules (Rust for performance-critical logic, Python for orchestration/UI)
+- ✅ Integration tests across reservation, scoring, and shopping workflows
+- ✅ GUI (PyQt or Tauri) and CLI support for headless execution
+- ✅ Modular plugin system for future enhancements (e.g., AI match prediction, AR scoreboard)
+
+---
+
+### 7. 🧵 Additional Modules You Might Consider
+
+| Module | Purpose | Notes |
+|--------|---------|-------|
+| Membership Management | Track member tiers, benefits, renewal | Supports QR-based check-in |
+| Tournament Engine | Bracket generation, match scheduling | Round-robin, knockout formats |
+| Coach Booking | Skill-based matching, session tracking | Feedback and rating system |
+| Feedback & Analytics | Collect user reviews, usage stats | Sentiment analysis, NPS tracking |
+| API Gateway | External integrations | Mobile apps, third-party booking platforms |
+
+---
+
+## 🏸 Swimlane Diagram: Badminton Business System
+
+This diagram maps key roles to workflow phases, showing how each actor interacts with system modules. Each swimlane represents a role, and each phase is a horizontal segment of the business lifecycle.
+
+```
+Roles →        | Booking Staff | Referee | Player | Technician | Shopkeeper | System Admin
+--------------------------------------------------------------------------------------------
+Reservation    | Create/edit bookings
+               | Confirm payments
+               | Notify players
+               |                |         | Receive booking info
+               |                |         | Join match
+               |                |         |         |             | Monitor court usage
+--------------------------------------------------------------------------------------------
+Match Setup    | Assign referee
+               | Configure match rules
+               |                | Setup scoreboard
+               |                | Validate player profiles
+               |                |         | Confirm participation
+               |                |         |         |             |             |
+--------------------------------------------------------------------------------------------
+Live Match     |                | Track scores
+               |                | Enforce rules
+               |                |         | Play match
+               |                |         |         |             |             |
+--------------------------------------------------------------------------------------------
+Post-Match     | Log results
+               |                | Submit referee report
+               |                |         | View stats
+               |                |         |         |             |             |
+--------------------------------------------------------------------------------------------
+Maintenance    |                |         |         | Inspect equipment
+               |                |         |         | Log wear levels
+               |                |         |         | Schedule repairs
+--------------------------------------------------------------------------------------------
+Shopping       |                |         | Browse gear
+               |                |         | Purchase items
+               |                |         |         |             | Manage inventory
+--------------------------------------------------------------------------------------------
+Analytics      | Export logs
+               |                |         |         |             | Review usage stats
+               |                |         |         |             | Optimize scheduling
+--------------------------------------------------------------------------------------------
+System Ops     |                |         |         |             |             | Configure modules
+               |                |         |         |             |             | Manage roles
+               |                |         |         |             |             | Run diagnostics
+```
+
+---
+
+## 🧩 Role-Phase Breakdown
+
+| Role           | Key Responsibilities | Onboarding Notes |
+|----------------|----------------------|------------------|
+| **Booking Staff** | Manage reservations, payments, notifications | Provide UI walkthrough, conflict resolution logic |
+| **Referee**       | Enforce rules, track scores, submit reports | Include BWF rule compliance, score validation tools |
+| **Player**        | Participate in matches, shop gear, view stats | Offer match setup preview, gear recommendations |
+| **Technician**    | Inspect, maintain, and repair equipment | Embed wear models, predictive maintenance alerts |
+| **Shopkeeper**    | Manage inventory, assist purchases | Show reorder triggers, product tagging system |
+| **System Admin**  | Configure modules, manage roles, monitor system health | Provide modular plugin guide, telemetry setup |

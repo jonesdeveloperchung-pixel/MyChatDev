@@ -17,7 +17,8 @@ from langgraph.graph import StateGraph, END
 # Application specific imports – replace with your own if needed.
 from models.llm_manager import LLMManager
 from workflow.quality_gate import QualityGate
-from config.settings import AVAILABLE_LLMS, DEFAULT_CONFIG
+from config.settings import DEFAULT_CONFIG, get_available_llms
+from config.llm_profiles import AVAILABLE_LLMS_BY_PROFILE
 from utils.prompts import get_prompt
 from utils.logging_config import log_node_execution
 
@@ -48,9 +49,12 @@ class WorkflowState(TypedDict):
 class CooperativeLLMGraph:
     """LangGraph implementation for cooperative LLM workflow."""
 
-    def __init__(self, config=DEFAULT_CONFIG):
+    def __init__(self, config=DEFAULT_CONFIG, llm_configs=None):
         """Initialize the workflow graph."""
         self.config = config
+        
+        # Use provided llm_configs or get default ones
+        self.llm_configs = llm_configs or get_available_llms()
 
         # Manager that knows how to call the underlying LLMs (OpenAI, Gemini, etc.)
         self.llm_manager = LLMManager(config)
@@ -88,10 +92,9 @@ class CooperativeLLMGraph:
         # Define deterministic edges – the workflow proceeds linearly.
         # ------------------------------------------------------------------- #
         workflow.add_edge("requirements_analysis", "system_design")
-        workflow.add_edge(
-            "system_design" + "review_refinement",
-            "code_implementation",
-        )
+        # workflow.add_edge("system_design", "code_implementation")
+        # workflow.add_edge("system_design+review_refinement", "code_implementation")
+        workflow.add_edge("system_design", "code_implementation", label="via review_refinement")
         workflow.add_edge("code_implementation", "testing_debugging")
         workflow.add_edge("testing_debugging", "review_refinement")
         workflow.add_edge("review_refinement", "quality_gate")
@@ -139,7 +142,7 @@ class CooperativeLLMGraph:
         """Product Manager analyzes requirements."""
         start_time = time.time()
 
-        llm_config = AVAILABLE_LLMS["product_manager"]
+        llm_config = self.llm_configs["product_manager"]
         prompt = get_prompt(
             "product_manager",
             user_input=state["user_input"],
@@ -181,7 +184,7 @@ class CooperativeLLMGraph:
         """Architect designs the system."""
         start_time = time.time()
 
-        llm_config = AVAILABLE_LLMS["architect"]
+        llm_config = self.llm_configs["architect"]
         prompt = get_prompt(
             "architect",
             requirements=state.requirements,
@@ -221,7 +224,7 @@ class CooperativeLLMGraph:
         """Programmer implements the code."""
         start_time = time.time()
 
-        llm_config = AVAILABLE_LLMS["programmer"]
+        llm_config = self.llm_configs["programmer"]
         prompt = get_prompt(
             "programmer",
             design=state.design,
@@ -261,7 +264,7 @@ class CooperativeLLMGraph:
         """Tester validates the implementation."""
         start_time = time.time()
 
-        llm_config = AVAILABLE_LLMS["tester"]
+        llm_config = self.llm_configs["tester"]
         prompt = get_prompt(
             "tester",
             code=state.code,
@@ -302,7 +305,7 @@ class CooperativeLLMGraph:
         """Reviewer provides feedback and refinement."""
         start_time = time.time()
 
-        llm_config = AVAILABLE_LLMS["reviewer"]
+        llm_config = self.llm_configs["reviewer"]
         # Turn the deliverables dict into a plain string to feed into the prompt
         deliverables_text = "\n\n".join(
             [f"{k}: {v}" for k, v in state.deliverables.items()]

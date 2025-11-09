@@ -5,7 +5,7 @@ import logging
 from typing import Dict, Any
 from models.llm_manager import LLMManager
 from workflow.quality_gate import QualityGate
-from config.settings import AVAILABLE_LLMS, DEFAULT_CONFIG
+from config.settings import DEFAULT_CONFIG, get_available_llms
 from utils.prompts import get_prompt
 from utils.logging_config import log_node_execution
 
@@ -38,7 +38,7 @@ class SimpleCooperativeLLM:
         )
         self.logger = logging.getLogger("coop_llm.simple")
         # Use provided LLM configs or fall back to default
-        self.llm_configs = llm_configs or AVAILABLE_LLMS
+        self.llm_configs = llm_configs or get_available_llms()
 
     async def requirements_analysis_node(self, state: WorkflowState) -> WorkflowState:
         """Product Manager analyzes requirements."""

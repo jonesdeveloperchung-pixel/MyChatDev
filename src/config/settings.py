@@ -54,3 +54,12 @@ class SystemConfig(BaseModel):
 
 # Default system configuration
 DEFAULT_CONFIG = SystemConfig()
+
+# Lazy import to avoid circular dependency
+def get_available_llms():
+    """Get the default AVAILABLE_LLMS configuration."""
+    from .llm_profiles import AVAILABLE_LLMS_BY_PROFILE
+    return AVAILABLE_LLMS_BY_PROFILE.get("High_Reasoning", AVAILABLE_LLMS_BY_PROFILE["Fast_Lightweight"])
+
+# For backward compatibility
+AVAILABLE_LLMS = None  # Will be set lazily

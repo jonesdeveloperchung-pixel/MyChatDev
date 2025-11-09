@@ -51,7 +51,9 @@ class GraphWorkflow:
         """
         self.config = config
         self.llm_manager = LLMManager(config)
-        self.llm_configs = llm_configs or AVAILABLE_LLMS
+        # Import here to avoid circular dependency
+        from config.settings import get_available_llms
+        self.llm_configs = llm_configs or get_available_llms()
         self.quality_gate = QualityGate(
             self.llm_manager,
             self.llm_configs["quality_gate"],

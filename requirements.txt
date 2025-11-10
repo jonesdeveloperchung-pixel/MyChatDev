@@ -1,8 +1,10 @@
 ollama>=0.3.0
-pydantic>=2.0.0
+pydantic>=2.7.1
 python-dotenv>=1.0.0
 pytest>=7.0.0
-langchain>=0.1.0
-langchain_community>=0.0.30
-langgraph>=0.0.20
+langchain>=0.1.20
+langchain-core>=0.1.52
+langchain_community>=0.0.38
+langsmith>=0.1.57
+langgraph>=0.0.48
 PyYAML>=6.0

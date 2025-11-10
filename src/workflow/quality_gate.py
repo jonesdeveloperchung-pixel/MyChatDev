@@ -140,7 +140,7 @@ class QualityGate:
             messages.append({"role": "system", "content": prompt_parts["system"]})
         messages.append({"role": "user", "content": prompt_parts["user"]})
 
-        self.logger.debug(f"Full prompt sent to Quality Gate LLM:\nSystem: {prompt_parts.get("system")}\nUser: {prompt_parts["user"]}\n---")
+        self.logger.debug(f"Full prompt sent to Quality Gate LLM:\nSystem: {prompt_parts.get('system')}\nUser: {prompt_parts['user']}\n---")
 
         try:
             # 2️⃣ Ask the LLM for a quality assessment.

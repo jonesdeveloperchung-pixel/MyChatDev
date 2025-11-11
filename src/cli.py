@@ -27,10 +27,10 @@ import platform # For system info
 from typing import Dict
 
 # ---------- Import everything that the original script needs ----------
-from workflow.graph_workflow import GraphWorkflow, GraphState
-from config.settings import DEFAULT_CONFIG, SystemConfig, LLMConfig
-from utils.logging_config import setup_logging
-from config.llm_profiles import AVAILABLE_LLMS_BY_PROFILE
+from src.workflow.graph_workflow import GraphWorkflow, GraphState
+from .config.settings import DEFAULT_CONFIG, SystemConfig, LLMConfig
+from .utils.logging_config import setup_logging
+from .config.llm_profiles import AVAILABLE_LLMS_BY_PROFILE
 
 # ------------------------------------------------- END IMPORTS ------------------------------------------------ #
 
@@ -299,6 +299,9 @@ async def run_command(args: argparse.Namespace) -> GraphState:
             log_level=log_level,
             enable_sandbox=args.enable_sandbox if args.enable_sandbox is not None else DEFAULT_CONFIG.enable_sandbox,
             enable_human_approval=args.enable_human_approval if args.enable_human_approval is not None else DEFAULT_CONFIG.enable_human_approval,
+            use_mcp_sandbox=args.use_mcp_sandbox if args.use_mcp_sandbox is not None else DEFAULT_CONFIG.use_mcp_sandbox,
+            mcp_server_host=args.mcp_server_host if args.mcp_server_host is not None else DEFAULT_CONFIG.mcp_server_host,
+            mcp_server_port=args.mcp_server_port if args.mcp_server_port is not None else DEFAULT_CONFIG.mcp_server_port,
             # Add other SystemConfig parameters here as they become available in args
         )
 
@@ -723,6 +726,18 @@ Examples:
     workflow_control.add_argument(
         "-A", "--enable-human-approval", action=argparse.BooleanOptionalAction,
         help=f"Enable or disable human approval step."
+    )
+    workflow_control.add_argument(
+        "--use-mcp-sandbox", action=argparse.BooleanOptionalAction,
+        help="Enable the MCP sandbox for isolated execution."
+    )
+    workflow_control.add_argument(
+        "--mcp-server-host", type=str,
+        help="Hostname or IP address of the MCP server."
+    )
+    workflow_control.add_argument(
+        "--mcp-server-port", type=int,
+        help="Port number of the MCP server."
     )
     workflow_control.add_argument(
         "--demo", action="store_true",

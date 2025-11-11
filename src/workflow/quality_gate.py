@@ -12,9 +12,9 @@ import re
 import json # Add this import
 from typing import Dict, Any, Tuple
 
-from models.llm_manager import LLMManager
-from config.settings import LLMConfig
-from utils.prompts import get_prompt
+from src.models.llm_manager import LLMManager
+from src.config.settings import LLMConfig
+from src.utils.prompts import get_prompt
 
 
 class QualityGate:

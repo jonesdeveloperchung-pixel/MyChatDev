@@ -11,12 +11,12 @@ from typing import TypedDict, List, Dict, Any
 
 from langgraph.graph import StateGraph, END
 
-from config.settings import SystemConfig, LLMConfig, DEFAULT_CONFIG
-from models.llm_manager import LLMManager
-from utils.logging_config import log_node_execution
-from utils.prompts import get_prompt
-from workflow.quality_gate import QualityGate
-from workflow.sandbox import Sandbox
+from src.config.settings import SystemConfig
+from src.models.llm_manager import LLMManager
+from src.utils.logging_config import log_node_execution
+from src.utils.prompts import get_prompt
+from .quality_gate import QualityGate
+
 
 
 # Define the state for our graph
@@ -45,14 +45,14 @@ class GraphWorkflow:
     Encapsulates the logic for the LangGraph-based cooperative LLM workflow.
     """
 
-    def __init__(self, config: SystemConfig = DEFAULT_CONFIG, llm_configs: Dict[str, LLMConfig] = None):
+    def __init__(self, config: SystemConfig = SystemConfig(), llm_configs: Dict[str, Any] = None):
         """
         Initializes the graph-based workflow.
         """
         self.config = config
         self.llm_manager = LLMManager(config)
         # Import here to avoid circular dependency
-        from config.settings import get_available_llms
+        from src.config.settings import get_available_llms
         self.llm_configs = llm_configs or get_available_llms()
         self.quality_gate = QualityGate(
             self.llm_manager,
@@ -60,7 +60,8 @@ class GraphWorkflow:
             config.quality_threshold,
             config.change_threshold,
         )
-        self.sandbox = Sandbox(config, self.llm_manager, self.llm_configs)
+        from .sandbox_factory import get_sandbox_implementation
+        self.sandbox = get_sandbox_implementation(config, self.llm_manager, self.llm_configs)
         self.logger = logging.getLogger("coop_llm.graph_workflow")
         self.graph = self._build_graph()
 
@@ -166,7 +167,7 @@ class GraphWorkflow:
         if self.config.enable_human_approval:
             return "human_approval"
         else:
-            if self.config.enable_sandbox:
+            if self.config.enable_sandbox or self.config.use_mcp_sandbox:
                 return "sandboxed_development"
             else:
                 return "code_generation_no_sandbox"

@@ -26,6 +26,9 @@ venv/
 ENV/
 env/
 
+# Sandbox
+sandbox/
+
 # Distribution / packaging
 *.egg-info/
 dist/

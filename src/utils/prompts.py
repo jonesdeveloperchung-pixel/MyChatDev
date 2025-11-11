@@ -211,7 +211,7 @@ Provide a structured response with the following sections:
 Use clear and professional language throughout, ensuring your analysis and recommendations are actionable and supported by the evaluation data.""",
 }
 
-from config.settings import SystemConfig, DEFAULT_CONFIG # Import SystemConfig and DEFAULT_CONFIG
+from src.config.settings import SystemConfig, DEFAULT_CONFIG # Import SystemConfig and DEFAULT_CONFIG
 
 def get_prompt(role: str, main_content: str = "", system_config: SystemConfig = DEFAULT_CONFIG, **kwargs) -> Dict[str, str]:
     """Get formatted system and user prompts for a specific role."""

@@ -8,14 +8,14 @@ import logging
 from typing import Dict, List, Optional, Any
 from ollama import AsyncClient
 from langchain_core.messages import AIMessage, HumanMessage # Import AIMessage and HumanMessage
-from config.settings import LLMConfig, SystemConfig, DEFAULT_CONFIG
+from src.config.settings import LLMConfig, SystemConfig
 from unittest.mock import MagicMock # Import MagicMock
 
 
 class LLMManager:
     """Manages communication with multiple Ollama-hosted LLMs."""
 
-    def __init__(self, config: SystemConfig = DEFAULT_CONFIG):
+    def __init__(self, config: SystemConfig = SystemConfig()):
         """Initialize LLM manager with configuration."""
         self.config = config
         self.client = AsyncClient(host=config.ollama_host)
@@ -72,8 +72,8 @@ class LLMManager:
                     "num_predict": llm_config.max_tokens,
                 },
             ):
-                if hasattr(part, "message") and hasattr(part.message, "content"):
-                    response_parts.append(part.message.content)
+                if part.get("message", {}).get("content"):
+                    response_parts.append(part["message"]["content"])
 
             response = "".join(response_parts)
             self.logger.info(

@@ -64,9 +64,9 @@ MyChatDev/
 
 ## 🎯 Usage
 
-## 🚀 Usage
-
 The Cooperative LLM CLI now features a structured command-line interface with sub-commands for different functionalities.
+
+> **Note:** You can run the CLI using either `python src/cli.py ...` or `python -m src.cli ...`. Both are valid and will produce the same results.
 
 ### Global Options
 
@@ -77,42 +77,80 @@ The Cooperative LLM CLI now features a structured command-line interface with su
 
 This is the primary command for executing the multi-agent LLM workflow.
 
+**Options for `run` command:**
+
+*   **Input Options:**
+    *   `-U, --user-prompt-file <path>`: Path to a file containing the user prompt.
+    *   `--user-prompt-text <text>`: Directly provide the user prompt as a string.
+*   **Profile Options:**
+    *   `-P, --profile <name>`: Name of a built-in LLM profile.
+    *   `-F, --profile-file <path>`: Path to a custom YAML file defining LLM configurations for roles.
+*   **Workflow Control:**
+    *   `-M, --max-iterations <int>`: Maximum number of workflow iterations.
+    *   `-Q, --quality-threshold <float>`: Minimum quality score required to halt the workflow.
+    *   `-C, --change-threshold <float>`: Minimum change magnitude to detect stagnation.
+    *   `-S, --enable-sandbox`: Enable the local sandboxed development environment.
+    *   `-A, --enable-human-approval`: Enable human approval step.
+    *   `--use-mcp-sandbox`: **Enable the Model Context Protocol (MCP) sandbox for isolated execution.**
+    *   `--mcp-server-host <host>`: **Hostname or IP address of the MCP server (default: 127.0.0.1).**
+    *   `--mcp-server-port <port>`: **Port number of the MCP server (default: 8000).**
+    *   `--demo`: Run in demo mode with quick, lightweight settings.
+    *   `--dry-run`: Simulate the workflow without executing LLM calls or saving deliverables.
+*   **Ollama Settings:**
+    *   `-O, --ollama-url <url>`: URL of the Ollama host.
+*   **Logging Options:**
+    *   `--log-level <level>`: Set the logging verbosity level (debug, info, warning, error, critical).
+    *   `--debug`: Enable verbose debug logging.
+
 **Examples:**
 
 *   **1. Run with default settings (uses built-in prompt and High_Reasoning profile):**
     ```bash
-    python src/cli.py run
+    python -m src.cli run
     ```
 
 *   **2. Run with a custom prompt file and a specific built-in profile:**
     ```bash
-    python src/cli.py run -U prompts/my_feature.txt -P Fast_Lightweight
+    python -m src.cli run -U prompts/my_feature.txt -P Fast_Lightweight
     ```
 
 *   **3. Run with a custom profile file and increased iterations:**
     ```bash
-    python src/cli.py run -F my_custom_profile.yaml -M 5
+    python -m src.cli run -F my_custom_profile.yaml -M 5
     ```
 
 *   **4. Run in demo mode (quick, lightweight settings):**
     ```bash
-    python src/cli.py run --demo
+    python -m src.cli run --demo
     ```
     This uses a default prompt and the `Fast_Lightweight` profile, with shorter iterations and disabled sandboxing/human approval for a quick demonstration.
 
 *   **5. Run with debug logging enabled:**
     ```bash
-    python src/cli.py run --debug -U prompts/my_feature.txt
+    python -m src.cli run --debug -U prompts/my_feature.txt
     ```
 
 *   **6. Simulate a run without execution or saving deliverables (Dry Run):**
     ```bash
-    python src/cli.py run --dry-run -U prompts/my_feature.txt
+    python -m src.cli run --dry-run -U prompts/my_feature.txt
     ```
 
-*   **7. Specify a custom output directory for deliverables:**
+*   **7. Run using the MCP Sandbox (requires MCP server to be running):**
     ```bash
-    python src/cli.py run -U prompts/my_feature.txt --output-dir my_custom_deliverables
+    # First, start the MCP server in a separate terminal
+    python mcp_server/mcp_server.py --host 127.0.0.1 --port 8000
+
+    # Then, run MyChatDev with the MCP sandbox enabled
+    python -m src.cli run --use-mcp-sandbox -U prompts/my_feature.txt
+    ```
+
+*   **8. Run using the MCP Sandbox with a custom server address:**
+    ```bash
+    # Start MCP server on a custom port
+    python mcp_server/mcp_server.py --host 127.0.0.1 --port 9000
+
+    # Run MyChatDev, specifying the custom MCP server address
+    python -m src.cli run --use-mcp-sandbox --mcp-server-port 9000 -U prompts/my_feature.txt
     ```
 
 ### `profile` command: Manage LLM profiles
@@ -123,23 +161,23 @@ This command allows you to list, show details, add, or delete LLM profiles.
 
 *   **1. List all available LLM profiles (built-in and user-defined):**
     ```bash
-    python src/cli.py profile list
+    python -m src.cli profile list
     ```
 
 *   **2. Display details of a specific LLM profile:**
     ```bash
-    python src/cli.py profile show High_Reasoning
+    python -m src.cli profile show High_Reasoning
     ```
 
 *   **3. Add a custom LLM profile from a YAML file:**
     ```bash
-    python src/cli.py profile add my_new_profile /path/to/my_profile.yaml
+    python -m src.cli profile add my_new_profile /path/to/my_profile.yaml
     ```
     Custom profiles are stored in `~/.coopllm/profiles/`.
 
 *   **4. Delete a user-defined LLM profile:**
     ```bash
-    python src/cli.py profile delete my_old_profile
+    python -m src.cli profile delete my_old_profile
     ```
 
 ### `config` command: Manage system configurations
@@ -150,23 +188,23 @@ This command allows you to view, set, edit, or reset system-wide configurations.
 
 *   **1. Display the current effective system configuration:**
     ```bash
-    python src/cli.py config show
+    python -m src.cli config show
     ```
 
 *   **2. Set a specific configuration key-value pair:**
     ```bash
-    python src/cli.py config set ollama_host http://192.168.1.100:11434
+    python -m src.cli config set ollama_host http://192.168.1.100:11434
     ```
 
 *   **3. Open the user configuration file in a text editor:**
     ```bash
-    python src/cli.py config edit
+    python -m src.cli config edit
     ```
     This opens `~/.coopllm/config.yaml`.
 
 *   **4. Reset user configuration to default settings:**
     ```bash
-    python src/cli.py config reset
+    python -m src.cli config reset
     ```
 
 ### `debug` command: Diagnostic and debugging utilities
@@ -177,7 +215,7 @@ This command provides tools for debugging the CLI.
 
 *   **1. Display the content of the debug log file:**
     ```bash
-    python src/cli.py debug log
+    python -m src.cli debug log
     ```
 
 ### `info` command: Display system information
@@ -188,12 +226,12 @@ This command provides information about the CLI and the system environment.
 
 *   **1. Display CLI version:**
     ```bash
-    python src/cli.py info version
+    python -m src.cli info version
     ```
 
 *   **2. Display system and environment details:**
     ```bash
-    python src/cli.py info system
+    python -m src.cli info system
     ```
 
 ## 🔧 Configuration
@@ -206,23 +244,23 @@ LLM profiles define the specific LLM models and parameters assigned to each agen
 
 *   **Listing Profiles:** To see all available built-in and user-defined profiles:
     ```bash
-    python src/cli.py profile list
+    python -m src.cli profile list
     ```
 
 *   **Showing Profile Details:** To inspect the configuration of a specific profile:
     ```bash
-    python src/cli.py profile show High_Reasoning
+    python -m src.cli profile show High_Reasoning
     ```
 
 *   **Adding Custom Profiles:** You can define your own profiles in YAML files and add them to the CLI:
     ```bash
-    python src/cli.py profile add MyCustomProfile /path/to/my_profile.yaml
+    python -m src.cli profile add MyCustomProfile /path/to/my_profile.yaml
     ```
     Custom profiles are stored in `~/.coopllm/profiles/`.
 
 *   **Deleting Custom Profiles:** To remove a user-defined profile:
     ```bash
-    python src/cli.py profile delete MyCustomProfile
+    python -m src.cli profile delete MyCustomProfile
     ```
 
 ### System Parameters
@@ -231,22 +269,22 @@ System-wide parameters (e.g., Ollama host, iteration limits, sandbox settings) a
 
 *   **Showing Current Configuration:** To view the active system configuration:
     ```bash
-    python src/cli.py config show
+    python -m src.cli config show
     ```
 
 *   **Setting Parameters:** To change a specific parameter:
     ```bash
-    python src/cli.py config set ollama_host http://192.168.1.100:11434
+    python -m src.cli config set ollama_host http://192.168.1.100:11434
     ```
 
 *   **Editing Configuration File:** To open the configuration file in your default editor for advanced changes:
     ```bash
-    python src/cli.py config edit
+    python -m src.cli config edit
     ```
 
 *   **Resetting Configuration:** To revert all user-defined settings to system defaults:
     ```bash
-    python src/cli.py config reset
+    python -m src.cli config reset
     ```
 
 
@@ -283,12 +321,12 @@ Logs are saved to `logs/coop_llm_YYYYMMDD_HHMMSS.log` (or `debug.log` for the `d
 
 *   **Enable Debug Logging for `run` command:** Use the `--debug` flag with the `run` command to enable verbose debug logging. This is equivalent to `--log-level debug`.
     ```bash
-    python src/cli.py run --debug -U prompts/my_feature.txt
+    python -m src.cli run --debug -U prompts/my_feature.txt
     ```
 
 *   **View Debug Log File:** Use the `debug log` command to display the content of the `debug.log` file (if it exists in the current working directory).
     ```bash
-    python src/cli.py debug log
+    python -m src.cli debug log
     ```
 
 ## 📦 Deliverables
@@ -303,19 +341,86 @@ The system generates:
 - **strategic_guidance.md** - Strategic guidance from the Reflector (if triggered)
 - **complete_state.json** - Full workflow state
 
+## ✅ Validating the Output
+
+After a successful run, you can validate the system's output by inspecting the generated deliverables and logs.
+
+### 1. Check the Deliverables
+
+The primary output of the system is saved in a timestamped sub-directory inside the `deliverables/` folder (e.g., `deliverables/20251111-232930/`). Inside this folder, you will find the following files:
+
+-   `requirements_specification.md`: The detailed requirements generated by the Product Manager. Check if this accurately reflects the initial user prompt.
+-   `system_design.md`: The technical design from the System Architect. Verify that it proposes a sensible architecture to meet the requirements.
+-   `source_code.md`: The code generated by the Programmer. This file will contain the implementation.
+-   `test_results.md`: The tests generated by the Tester and the results of running them (if the sandbox is enabled).
+-   `review_feedback.md`: Feedback from the Code Reviewer on the generated code.
+-   `complete_state.json`: A JSON file containing the final state of the entire workflow, including all deliverables and quality evaluations. This is useful for debugging and detailed inspection.
+
+### 2. Inspect the Sandbox (if used)
+
+If you ran the workflow with the `--use-mcp-sandbox` flag, the `sandbox/` directory will contain the files generated and used during the sandboxed execution. You can inspect these files to see the code and tests that were actually run.
+
+-   `generated_code.py`: The Python code generated by the Programmer agent.
+-   You might also find other files related to testing if the testing framework creates them.
+
+The contents of the `sandbox/` directory are temporary and will be overwritten on subsequent runs.
+
+### 3. Review the Logs
+
+The logs provide a detailed trace of the workflow's execution. A new log file is created for each run in the `logs/` directory.
+
+When reviewing the logs, look for:
+-   **Node Execution summaries**: These show which node was executed, how long it took, and what data it produced.
+-   **LLM Generations**: You can see how many characters were generated by each LLM agent.
+-   **Quality Gate Decisions**: The logs show the quality score, change magnitude, and the final decision (CONTINUE, HALT, or REFLECT) of the quality gate at each iteration.
+-   **Sandbox Activity**: When the sandbox is used, you will see logs from the `sandboxed_development_node` indicating that it is generating and executing code.
+-   **Errors and Warnings**: Any errors or warnings will be clearly marked in the logs.
+
+By combining the information from the deliverables, sandbox, and logs, you can get a comprehensive understanding of the system's performance and the quality of its output.
+
 ## 🧪 Testing
 
-Run unit tests:
+The project includes a comprehensive test suite covering unit, integration, and end-to-end tests for both the core MyChatDev workflow and the new MCP components.
+
+### Running All Tests
+
+To run the entire test suite, including all unit and integration tests for MyChatDev and the MCP server/client, use the `run_tests.py` script:
 
 ```bash
-pytest tests/
+python run_tests.py
 ```
+This script will execute all tests found in the `tests/` directory and provide a summary of the results.
 
-Run specific test:
+### Running Specific Tests
 
-```bash
-pytest tests/test_llm_manager.py::TestLLMManager::test_generate_response_success
-```
+You can also run specific test files or individual test cases using `pytest`:
+
+*   **Run all tests in a directory:**
+    ```bash
+    pytest tests/unit/
+    ```
+
+*   **Run all tests in a specific file:**
+    ```bash
+    pytest tests/integration/test_mcp_server_api.py
+    ```
+
+*   **Run a specific test case:**
+    ```bash
+    pytest tests/integration/test_mcp_server_api.py::TestMCPServerAPI::test_valid_write_file_instruction
+    ```
+
+### MCP-Specific Tests
+
+The `tests/` directory now contains dedicated tests for the MCP implementation:
+
+*   `tests/unit/test_context_manager.py`
+*   `tests/unit/test_exec_engine.py`
+*   `tests/unit/test_file_ops_engine.py`
+*   `tests/unit/test_mcp_sandbox.py`
+*   `tests/integration/test_mcp_server_api.py`
+
+These tests ensure the correct functioning of the MCP server components and the `MCPSandbox` client.
 
 ## 📈 Evaluation Metrics
 
@@ -400,14 +505,14 @@ For detailed design concepts and future plans regarding the plugin system, pleas
 
 2.  **Connection Error**
     *   Ensure Ollama is running: `ollama serve`
-    *   Check your Ollama host configuration using `python src/cli.py config show` or specify it with `python src/cli.py run -O <ollama_host_url>`.
+    *   Check your Ollama host configuration using `python -m src.cli config show` or specify it with `python -m src.cli run -O <ollama_host_url>`.
 
 3.  **Memory Issues / Ollama Runner Crashes**
     *   This can manifest as `llama runner process has terminated` errors.
     *   Ensure your system has sufficient RAM for the models you are running.
-    *   Try using smaller models (e.g., with the `Low_Reasoning` profile: `python src/cli.py run -P Low_Reasoning ...`).
+    *   Try using smaller models (e.g., with the `Low_Reasoning` profile: `python -m src.cli run -P Low_Reasoning ...`).
     *   Restart your Ollama server.
-    *   Enable compression (if available in `SystemConfig`): `python src/cli.py config set enable_compression true`.
+    *   Enable compression (if available in `SystemConfig`): `python -m src.cli config set enable_compression true`.
 
 4.  **Graph Recursion Limit Managed Dynamically**
     *   This used to manifest as `GraphRecursionError: Recursion limit of X reached`.

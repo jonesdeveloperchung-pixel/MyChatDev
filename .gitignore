@@ -10,6 +10,9 @@ __pycache__/
 # Logs
 *.log
 
+# Database
+data/db.sqlite
+
 # Deliverables
 deliverables/
 
@@ -28,6 +31,10 @@ env/
 
 # Sandbox
 sandbox/
+
+# LLM Prompt files and configurations
+src/prompts/
+src/config/*.txt
 
 # Distribution / packaging
 *.egg-info/

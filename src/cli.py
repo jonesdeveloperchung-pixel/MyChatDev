@@ -18,19 +18,16 @@ import asyncio
 import json
 import sys
 from pathlib import Path
-from datetime import datetime
-import yaml
-import re # For URL validation
 import os # For opening editor
 import platform # For system info
 
-from typing import Dict
+from typing import Dict, Any
 
 # ---------- Import everything that the original script needs ----------
-from src.workflow.graph_workflow import GraphWorkflow, GraphState
-from .config.settings import DEFAULT_CONFIG, SystemConfig, LLMConfig
+from .config.settings import DEFAULT_CONFIG, SystemConfig, LLMConfig, load_user_config, save_user_config, USER_CONFIG_FILE, normalize_ollama_url, USER_PROFILES_DIR
 from .utils.logging_config import setup_logging
-from .config.llm_profiles import AVAILABLE_LLMS_BY_PROFILE
+from .config.llm_profiles import AVAILABLE_LLMS_BY_PROFILE, load_profile_from_file
+from .workflow_service import execute_workflow # Import the new service function
 
 # ------------------------------------------------- END IMPORTS ------------------------------------------------ #
 
@@ -75,130 +72,8 @@ def _read_prompt_from_file(file_path: Path) -> str:
 # -------------------------------------------------------------------------------- #
 
 
-# ---------- Helper: save deliverables (unchanged but with comments) ----------
-async def save_deliverables(state, output_dir: Path):
-    """
-    Save all deliverables to files.
-    Parameters
-    ----------
-    state: WorkflowState
-        The final state returned by the workflow.
-    output_dir: Path
-        The base directory where deliverables will be stored.
-    """
-    # 1. Make sure the base folder exists.
-    output_dir.mkdir(parents=True, exist_ok=True)
-    # 2. Create a sub‑folder named with the current timestamp
-    #    (e.g. 20251004-154609).
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    timestamp_dir = output_dir / timestamp  # <-- correct path
-    timestamp_dir.mkdir(parents=True, exist_ok=True)
-    # 3. Map state attributes to file names.
-    deliverable_files = {
-        "requirements_specification.md": state.requirements,
-        "system_design.md": state.design,
-        "source_code.md": state.code,
-        "test_results.md": state.test_results,
-        "review_feedback.md": state.review_feedback,
-    }
-    # 4. Write each deliverable.
-    for filename, content in deliverable_files.items():
-        if content:  # skip empty sections
-            file_path = timestamp_dir / filename  # <-- correct path
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.write(content)
-    # 5. Dump the whole state to a JSON file for later inspection.
-    state_data = {
-        "user_input": state.user_input,
-        "deliverables": state.deliverables,
-        "quality_evaluations": state.quality_evaluations,
-        "iteration_count": state.iteration_count,
-        "timestamp": timestamp,
-    }
-    state_file = timestamp_dir / f"{timestamp}_complete_state.json"
-    with open(state_file, "w", encoding="utf-8") as f:
-        json.dump(state_data, f, indent=2, ensure_ascii=False)
-    # Return the directory that now contains the files and the timestamp used.
-    return timestamp_dir, timestamp
-
-
-# -------------------------------------------------------------------------------- #
-
-
-# ---------- Helper: Normalize Ollama URL ----------
-def _normalize_ollama_url(url_string: str) -> str:
-    """
-    Normalizes an Ollama URL string by ensuring it has a scheme (http://)
-    and a default port (11434) if not specified.
-    """
-    # Basic URL validation regex (simplified)
-    url_pattern = re.compile(r"^https?://[a-zA-Z0-9.-]+(?::\d{1,5})?(?:/.*)?$")
-    if not url_pattern.match(url_string):
-        raise ValueError(f"Invalid URL format: {url_string}")
-
-    # Ensure scheme is present
-    if not url_string.startswith("http://") and not url_string.startswith("https://"):
-        url_string = f"http://{url_string}"
-
-    # Check if a port is specified. If not, append the default Ollama port.
-    # This is a simple check and might not cover all edge cases, but should work for IP:Port and IP.
-    # We look for a colon AFTER the scheme part.
-    if ":" not in url_string.split("//", 1)[-1]:
-        url_string = f"{url_string}:11434"  # Default Ollama port
-
-    return url_string
-
-
-# -------------------------------------------------------------------------------- #
-
-
-def _load_profile_from_file(file_path: Path) -> Dict[str, LLMConfig]:
-    """
-    Loads an LLM profile from a specified YAML file.
-    The file is expected to define a dictionary where keys are role names
-    and values are dictionaries representing LLMConfig parameters.
-    """
-    if not file_path.is_file():
-        raise FileNotFoundError(f"Profile file not found: {file_path}")
-    
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            raw_configs = yaml.safe_load(f)
-    except yaml.YAMLError as exc:
-        raise RuntimeError(f"Invalid YAML format in profile file '{file_path}'.") from exc
-    except Exception as exc:
-        raise RuntimeError(f"Failed to read profile file '{file_path}'.") from exc
-
-    if not isinstance(raw_configs, dict):
-        raise TypeError(
-            f"Profile file '{file_path}' must contain a dictionary at its root."
-        )
-
-    loaded_configs: Dict[str, LLMConfig] = {}
-    for role, config_data in raw_configs.items():
-        if not isinstance(config_data, dict):
-            raise TypeError(
-                f"Configuration for role '{role}' in '{file_path}' must be a dictionary."
-            )
-        try:
-            # Ensure name and role are present, or default them
-            config_data.setdefault('name', role.replace('_', ' ').title())
-            config_data.setdefault('role', role)
-            loaded_configs[role] = LLMConfig(**config_data)
-        except Exception as exc:
-            raise ValueError(
-                f"Invalid LLMConfig data for role '{role}' in '{file_path}'. "
-                f"Details: {exc}"
-            ) from exc
-    
-    return loaded_configs
-
-
-# -------------------------------------------------------------------------------- #
-
-
 # ---------- Run Command Function (formerly main) -------------------------------- #
-async def run_command(args: argparse.Namespace) -> GraphState:
+async def run_command(args: argparse.Namespace) -> Dict[str, Any]:
     """Executes the cooperative LLM workflow based on provided arguments."""
     
     # Setup logging
@@ -224,7 +99,7 @@ async def run_command(args: argparse.Namespace) -> GraphState:
     # Ollama URL
     if args.ollama_url:
         try:
-            _normalize_ollama_url(args.ollama_url) # Just validate, actual assignment happens later
+            normalize_ollama_url(args.ollama_url) # Just validate, actual assignment happens later
         except ValueError as e:
             logger.fatal(f"Error: {e}")
             sys.exit(1)
@@ -240,6 +115,10 @@ async def run_command(args: argparse.Namespace) -> GraphState:
         logger.fatal(f"Error: --change-threshold must be between 0.0 and 1.0. Received: {args.change_threshold}")
         sys.exit(1)
     # --- End Validation ---
+
+    user_input: str
+    llm_configs: Dict[str, LLMConfig]
+    system_config: SystemConfig
 
     # Handle --demo flag
     if args.demo:
@@ -270,10 +149,10 @@ async def run_command(args: argparse.Namespace) -> GraphState:
             logger.debug(f"User prompt provided as text. Length = {len(user_input)}")
 
         # Determine LLM configurations
-        llm_configs: Dict[str, LLMConfig] = {}
+        llm_configs = {} # Initialize to empty dict
         if args.profile_file:
             try:
-                llm_configs = _load_profile_from_file(Path(args.profile_file))
+                llm_configs = load_profile_from_file(Path(args.profile_file))
                 logger.info(f"Successfully loaded custom profile from '{args.profile_file}'.")
             except (FileNotFoundError, RuntimeError, TypeError, ValueError) as e:
                 logger.fatal(f"Error loading profile from file '{args.profile_file}': {e}")
@@ -292,7 +171,7 @@ async def run_command(args: argparse.Namespace) -> GraphState:
 
         # Construct SystemConfig from arguments and defaults
         system_config = SystemConfig(
-            ollama_host=_normalize_ollama_url(args.ollama_url) if args.ollama_url else DEFAULT_CONFIG.ollama_host,
+            ollama_host=normalize_ollama_url(args.ollama_url) if args.ollama_url else DEFAULT_CONFIG.ollama_host,
             max_iterations=args.max_iterations if args.max_iterations is not None else DEFAULT_CONFIG.max_iterations,
             quality_threshold=args.quality_threshold if args.quality_threshold is not None else DEFAULT_CONFIG.quality_threshold,
             change_threshold=args.change_threshold if args.change_threshold is not None else DEFAULT_CONFIG.change_threshold,
@@ -317,71 +196,48 @@ async def run_command(args: argparse.Namespace) -> GraphState:
             logger.debug(f"  Role '{role}': model={cfg.model_id}  temp={cfg.temperature}")
     # ---------------------------------------------------------------------------
 
-    # --- Dry Run ---
-    if args.dry_run:
-        logger.info("Dry run enabled. Skipping actual workflow execution and deliverable saving.")
-        logger.info("--- Dry Run Summary ---")
-        logger.info(f"User Input (first 100 chars): {user_input[:100]}...")
-        logger.info(f"System Config: {system_config.model_dump_json(indent=2)}")
-        logger.info(f"LLM Configs (first role): {list(llm_configs.keys())[0] if llm_configs else 'N/A'}")
-        if llm_configs:
-            for role, cfg in llm_configs.items():
-                logger.info(f"  Role '{role}': model={cfg.model_id}  temp={cfg.temperature}")
-        logger.info("-----------------------")
-        return # Exit here for dry run
+    # Use the new execute_workflow service
+    final_state_dict = {}
+    async for event in execute_workflow(
+        user_input=user_input,
+        system_config=system_config,
+        llm_configs=llm_configs,
+        dry_run=args.dry_run
+    ):
+        event_type = event.get("event_type")
+        if event_type == "workflow_start":
+            logger.info(f"Workflow started. Run ID: {event.get('run_id')}")
+        elif event_type == "node_execution":
+            logger.info(f"Executing node: {event.get('node')}")
+        elif event_type == "log":
+            level = event.get("level", "INFO")
+            message = event.get("message", "")
+            if level.upper() == "DEBUG":
+                logger.debug(message)
+            elif level.upper() == "WARNING":
+                logger.warning(message)
+            elif level.upper() == "ERROR":
+                logger.error(message)
+            else:
+                logger.info(message)
+        elif event_type == "workflow_end":
+            final_state_dict = event.get("final_state")
+            logger.info(f"Workflow finished. Status: {event.get('status')}")
+        elif event_type == "workflow_error":
+            logger.error(f"Workflow failed: {event.get('error_details')}")
 
-    try:
-        # Initialise and run workflow
-        workflow = GraphWorkflow(system_config, llm_configs)
-        logger.info(f"Starting workflow with input: {user_input[:100]}...")
-        final_state_dict = await workflow.run(user_input)
-
-        class TempState:
-            def __init__(self, **entries):
-                self.__dict__.update(entries)
-
-        final_state = TempState(**final_state_dict)
-
-        output_dir = Path("deliverables")
-        saved_dir, timestamp = await save_deliverables(final_state, output_dir)
-        
-        logger.info("=== WORKFLOW SUMMARY ===")
-        logger.info(f"Iterations completed: {final_state.iteration_count}")
-        logger.info(f"Quality evaluations: {len(final_state.quality_evaluations)}")
-        logger.info(f"Deliverables saved to: {saved_dir}")
-        if final_state.quality_evaluations:
-            final_quality = final_state.quality_evaluations[-1].get("quality_score", 0)
-            logger.info(f"Final quality score: {final_quality:.2f}")
-        print("\n" + "=" * 60)
-        print("🎉 COOPERATIVE LLM WORKFLOW COMPLETED!")
-        print(f"📁 Deliverables saved to: {saved_dir}")
-        print(f"🔄 Iterations: {final_state.iteration_count}")
-        print("=" * 60)
-        return final_state_dict
-    except Exception as exc:
-        logger.fatal(f"Fatal error in main execution: {exc}")
-        sys.exit(1)
+    return final_state_dict
 
 
 # -------------------------------------------------------------------------------- #
 
 
 # ---------- Profile Command Functions ------------------------------------------- #
-USER_PROFILES_DIR = Path.home() / ".coopllm" / "profiles"
-USER_PROFILES_DIR.mkdir(parents=True, exist_ok=True)
+
 
 def get_user_profiles_dir() -> Path:
     # This function is now redundant but kept for potential external use or clarity
     return USER_PROFILES_DIR
-
-# -------------------------------------------------------------------------------- #
-
-
-# ---------- Config Command Functions -------------------------------------------- #
-def get_user_config_file() -> Path:
-    path = Path.home() / ".coopllm" / "config.yaml"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    return path
 
 def _get_all_profiles() -> Dict[str, Dict[str, LLMConfig]]:
     """Returns a dictionary of all available profiles (built-in and user-defined)."""
@@ -389,8 +245,8 @@ def _get_all_profiles() -> Dict[str, Dict[str, LLMConfig]]:
     for profile_file in USER_PROFILES_DIR.glob("*.yaml"):
         try:
             profile_name = profile_file.stem
-            # Use _load_profile_from_file to validate structure
-            all_profiles[profile_name] = _load_profile_from_file(profile_file)
+            # Use load_profile_from_file to validate structure
+            all_profiles[profile_name] = load_profile_from_file(profile_file)
         except Exception as e:
             # Log a warning but don't exit, as other profiles might be valid
             print(f"Warning: Could not load user profile '{profile_file.name}': {e}", file=sys.stderr)
@@ -401,7 +257,7 @@ def _save_user_profile(profile_name: str, file_path: Path):
     target_path = USER_PROFILES_DIR / f"{profile_name}.yaml"
     try:
         # Validate the content before saving
-        _load_profile_from_file(file_path) 
+        load_profile_from_file(file_path) 
         target_path.write_bytes(file_path.read_bytes())
         print(f"Profile '{profile_name}' added successfully from '{file_path}'.")
     except Exception as e:

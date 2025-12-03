@@ -1,6 +1,6 @@
 # MyChatDev - Cooperative LLM System with Ollama
 
-A Python program that enables cooperative interaction between multiple locally hosted LLMs using Ollama, orchestrated through LangGraph workflows.
+A Python program that enables cooperative interaction between multiple locally hosted LLMs using Ollama, orchestrated through LangGraph workflows. It features both a powerful Command-Line Interface (CLI) and a modern Web User Interface (Web UI) built with Flutter and FastAPI.
 
 ## Author
 
@@ -10,6 +10,12 @@ A Python program that enables cooperative interaction between multiple locally h
 ## 🏗️ Architecture
 
 The system implements a **Multi-Layered Validation Workflow** where different LLMs take on specialized roles, orchestrated through a **graph-based state machine using LangGraph**. The key to this architecture is a series of fast, iterative loops that validate the work at each stage, including a sandboxed environment for code development and a reflective mechanism for overcoming stagnation.
+
+The architecture is now composed of three main layers:
+
+1.  **Core LLM Workflow (Python):** The intelligent backend orchestrating agents and executing development tasks.
+2.  **FastAPI Backend API (Python):** A layer that exposes the core workflow functionalities via a RESTful API, enabling external applications to interact with MyChatDev.
+3.  **Flutter Web UI (Dart):** A rich, interactive web interface that consumes the FastAPI to provide a user-friendly experience for configuring, running, and monitoring development workflows.
 
 ### Agent Roles
 - **Product Manager**: Analyzes initial requirements (derived from the user's prompt) and consults the system's **Experience/Memory**.
@@ -28,12 +34,15 @@ MyChatDev/
 ├── src/
 │   ├── cli.py                     # Main CLI entry point and orchestration
 │   ├── main.py                    # Main application entry point
+│   ├── api.py                     # FastAPI backend API for UI interaction
 │   ├── example_usage.py           # Example usage script
 │   ├── config/                  # Configuration files
 │   ├── workflow/                # Workflow logic
 │   ├── utils/                   # Utility functions
 │   ├── models/                  # LLM models
 │   └── prompts/                 # Prompt templates
+├── ui/
+│   └── flutter_app/             # Flutter Web UI application
 ├── tests/
 │   └── ...                      # Test files
 ├── docs/
@@ -42,28 +51,60 @@ MyChatDev/
 │   └── ...                      # Log files
 ├── .gitignore                 # Git ignore file
 ├── requirements.txt           # Python dependencies
+├── run_api.py                 # Entry point to run the FastAPI server
 └── README.md                  # This file
 ```
 
 ## 🚀 Installation
 
-1. **Install Python dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+1.  **Install Python dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-2. **Ensure Ollama is running:**
-   ```bash
-   ollama serve
-   ```
+2.  **Ensure Ollama is running:**
+    ```bash
+    ollama serve
+    ```
 
-3. **Verify required models are available:**
-   ```bash
-   ollama list
-   ```
+3.  **Verify required models are available:**
+    ```bash
+    ollama list
+    ```
+
+4.  **Install Flutter SDK:**
+    Follow the official Flutter installation guide for your operating system: [https://flutter.dev/docs/get-started/install](https://flutter.dev/docs/get-started/install)
+
+5.  **Navigate to Flutter UI directory and get dependencies:**
+    ```bash
+    cd ui/flutter_app
+    flutter pub get
+    cd ../.. # Go back to project root
+    ```
 
 ## 🎯 Usage
 
+MyChatDev can be used via its powerful Command-Line Interface (CLI) or its interactive Web User Interface (Web UI).
+
+### A. Web User Interface (UI)
+
+The Web UI provides a user-friendly way to configure, run, and monitor development workflows.
+
+1.  **Start the FastAPI Backend API:**
+    Open a terminal in the project root (`MyChatDev/`) and run:
+    ```bash
+    python run_api.py
+    ```
+    This will start the FastAPI server, usually on `http://127.0.0.1:8000`. Keep this terminal running.
+
+2.  **Run the Flutter Frontend:**
+    Open a *new* terminal, navigate to the Flutter UI directory (`MyChatDev/ui/flutter_app/`), and run:
+    ```bash
+    flutter run -d chrome
+    ```
+    (Replace `-d chrome` with your preferred device, e.g., `-d windows` for a desktop app). The Flutter app will launch in your browser or a new window, connecting to the FastAPI backend.
+
+### B. Command-Line Interface (CLI)
 The Cooperative LLM CLI now features a structured command-line interface with sub-commands for different functionalities.
 
 > **Note:** You can run the CLI using either `python src/cli.py ...` or `python -m src.cli ...`. Both are valid and will produce the same results.
@@ -236,11 +277,11 @@ This command provides information about the CLI and the system environment.
 
 ## 🔧 Configuration
 
-The Cooperative LLM CLI provides dedicated sub-commands to manage LLM profiles and system-wide configurations.
+The Cooperative LLM system provides dedicated sub-commands (via CLI) and API endpoints (via Web UI) to manage LLM profiles and system-wide configurations.
 
 ### LLM Profiles
 
-LLM profiles define the specific LLM models and parameters assigned to each agent role (e.g., Product Manager, Programmer, Tester). You can manage these profiles using the `profile` sub-command.
+LLM profiles define the specific LLM models and parameters assigned to each agent role (e.g., Product Manager, Programmer, Tester). You can manage these profiles using the `profile` sub-command or the Web UI.
 
 *   **Listing Profiles:** To see all available built-in and user-defined profiles:
     ```bash
@@ -265,7 +306,7 @@ LLM profiles define the specific LLM models and parameters assigned to each agen
 
 ### System Parameters
 
-System-wide parameters (e.g., Ollama host, iteration limits, sandbox settings) are managed via the `config` sub-command. These settings are stored in `~/.coopllm/config.yaml`.
+System-wide parameters (e.g., Ollama host, iteration limits, sandbox settings) are managed via the `config` sub-command (CLI) or the Global Settings screen (Web UI). These settings are stored in `~/.coopllm/config.yaml`.
 
 *   **Showing Current Configuration:** To view the active system configuration:
     ```bash
@@ -343,7 +384,7 @@ The system generates:
 
 ## ✅ Validating the Output
 
-After a successful run, you can validate the system's output by inspecting the generated deliverables and logs.
+After a successful run, you can validate the system's output by inspecting the generated deliverables and logs. This can be done via the file system or through the Web UI's "Past Tasks" section.
 
 ### 1. Check the Deliverables
 

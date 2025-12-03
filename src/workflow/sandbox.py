@@ -11,8 +11,8 @@ from typing import List, Dict, Any
 from langchain_core.runnables import RunnableLambda
 from langchain_core.messages import HumanMessage
 
-from models.llm_manager import LLMManager
-from config.settings import SystemConfig, LLMConfig
+from src.models.llm_manager import LLMManager
+from src.config.settings import SystemConfig, LLMConfig
 
 import re
 import ast # Add this import at the top

@@ -9,52 +9,54 @@ from pathlib import Path
 from datetime import datetime
 import time # Import time for measuring execution time
 
-from workflow.graph_workflow import GraphWorkflow
+# Removed GraphWorkflow import as it's now encapsulated
 from config.settings import DEFAULT_CONFIG, SystemConfig
 from config.llm_profiles import AVAILABLE_LLMS_BY_PROFILE # Import profiles
 from utils.logging_config import setup_logging
+from .workflow_service import execute_workflow, save_deliverables # Import execute_workflow and save_deliverables from service
 
 
-async def save_deliverables(state, output_dir: Path, timestamp: str):
-    """Save all deliverables to files."""
-    output_dir.mkdir(parents=True, exist_ok=True)
+# Removed save_deliverables helper function as it's now in src/workflow_service.py
+# async def save_deliverables(state, output_dir: Path, timestamp: str):
+#     """Save all deliverables to files."""
+#     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create a sub‑folder named with the current timestamp
-    # (e.g. 20251004-154609).
-    timestamp_dir = output_dir / timestamp
-    timestamp_dir.mkdir(parents=True, exist_ok=True)
+#     # Create a sub‑folder named with the current timestamp
+#     # (e.g. 20251004-154609).
+#     timestamp_dir = output_dir / timestamp
+#     timestamp_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save individual deliverables
-    deliverable_files = {
-        "requirements_specification.md": state.requirements,
-        "system_design.md": state.design,
-        "source_code.py": state.code,
-        "test_results.md": state.test_results,
-        "review_feedback.md": state.review_feedback,
-        "strategic_guidance.md": state.strategic_guidance, # Include strategic guidance
-    }
+#     # Save individual deliverables
+#     deliverable_files = {
+#         "requirements_specification.md": state.requirements,
+#         "system_design.md": state.design,
+#         "source_code.py": state.code,
+#         "test_results.md": state.test_results,
+#         "review_feedback.md": state.review_feedback,
+#         "strategic_guidance.md": state.strategic_guidance, # Include strategic guidance
+#     }
 
-    for filename, content in deliverable_files.items():
-        if content:
-            file_path = timestamp_dir / filename
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.write(content)
+#     for filename, content in deliverable_files.items():
+#         if content:
+#             file_path = timestamp_dir / filename
+#             with open(file_path, "w", encoding="utf-8") as f:
+#                 f.write(content)
 
-    # Save complete state as JSON
-    state_data = {
-        "user_input": state.user_input,
-        "deliverables": state.deliverables,
-        "quality_evaluations": state.quality_evaluations,
-        "iteration_count": state.iteration_count,
-        "should_halt": state.should_halt, # Include should_halt
-        "timestamp": timestamp,
-    }
+#     # Save complete state as JSON
+#     state_data = {
+#         "user_input": state.user_input,
+#         "deliverables": state.deliverables,
+#         "quality_evaluations": state.quality_evaluations,
+#         "iteration_count": state.iteration_count,
+#         "should_halt": state.should_halt, # Include should_halt
+#         "timestamp": timestamp,
+#     }
 
-    state_file = timestamp_dir / f"{timestamp}_complete_state.json"
-    with open(state_file, "w", encoding="utf-8") as f:
-        json.dump(state_data, f, indent=2, ensure_ascii=False)
+#     state_file = timestamp_dir / f"{timestamp}_complete_state.json"
+#     with open(state_file, "w", encoding="utf-8") as f:
+#         json.dump(state_data, f, indent=2, ensure_ascii=False)
 
-    return timestamp_dir, timestamp
+#     return timestamp_dir, timestamp
 
 
 async def main():
@@ -79,7 +81,7 @@ async def main():
 
     for i, user_input in enumerate(test_cases):
         logger.info(f"--- Running Test Case {i+1}/{len(test_cases)} ---")
-        start_time = time.time()
+        start_time = time.time() # This time tracking will be overwritten by execute_workflow's internal timing
 
         try:
             # Create a custom SystemConfig for this test run (can be customized per test case)
@@ -100,34 +102,24 @@ async def main():
             )
             logger.debug(f"Custom config for test case {i+1}: {custom_config}")
 
-            # Initialize and run workflow
-            workflow = GraphWorkflow(custom_config, llm_configs) # Pass custom_config and llm_configs
-            logger.info(f"Starting workflow with input: {user_input[:100]}...")
+            # Execute workflow using the service function
+            final_state_dict = await execute_workflow(
+                user_input=user_input,
+                system_config=custom_config,
+                llm_configs=llm_configs,
+                dry_run=False # main.py runs actual tests
+            )
 
-            # Execute workflow
-            final_state_dict = await workflow.run(user_input)
-
-            # HACK: Convert dict to a temporary object to maintain compatibility with save_deliverables
-            class TempState:
-                def __init__(self, **entries):
-                    self.__dict__.update(entries)
-
-            final_state = TempState(**final_state_dict)
-
-            # Save deliverables
-            output_dir = Path("deliverables")
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            saved_dir, _ = await save_deliverables(final_state, output_dir, timestamp)
-
-            # Collect results
+            # Collect results from the returned dictionary
             result = {
                 "test_case_id": i + 1,
                 "user_input": user_input,
-                "iterations": final_state.iteration_count,
-                "halted_successfully": final_state.should_halt,
-                "final_quality_score": final_state.quality_evaluations[-1].get("overall_quality_score", 0) if final_state.quality_evaluations else 0,
-                "time_to_completion": time.time() - start_time,
-                "deliverables_path": saved_dir.name,
+                "iterations": final_state_dict.get('iteration_count', 0),
+                "halted_successfully": final_state_dict.get('should_halt', False),
+                "final_quality_score": final_state_dict.get('final_quality_score', 0),
+                "time_to_completion": final_state_dict.get('time_to_completion', 0),
+                "deliverables_path": final_state_dict.get('deliverables_path', 'N/A'),
+                "status": final_state_dict.get('status', 'completed')
             }
             all_results.append(result)
 
@@ -144,7 +136,8 @@ async def main():
                 "test_case_id": i + 1,
                 "user_input": user_input,
                 "error": str(e),
-                "time_to_completion": time.time() - start_time,
+                "time_to_completion": time.time() - start_time, # Fallback if execute_workflow didn't return time
+                "status": "error"
             })
         logger.info(f"--- Finished Test Case {i+1} ---")
         logger.info("-" * 80)
@@ -153,7 +146,7 @@ async def main():
     logger.info("=== ALL TEST CASES COMPLETED ===")
     logger.info("--- Overall Performance Summary ---")
     for res in all_results:
-        if "error" in res:
+        if res.get("status") == "error":
             logger.info(f"Test Case {res['test_case_id']}: ERROR - {res['error']} (Time: {res['time_to_completion']:.2f}s)")
         else:
             logger.info(f"Test Case {res['test_case_id']}: Iterations={res['iterations']}, Halted={res['halted_successfully']}, Quality={res['final_quality_score']:.2f}, Time={res['time_to_completion']:.2f}s")

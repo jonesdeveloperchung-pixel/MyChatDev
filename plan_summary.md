@@ -56,4 +56,8 @@ The new design focuses on making the Cooperative LLM System more robust, efficie
 *   **Improvement:** Implement a comprehensive logging strategy with refined severity levels and enhance CLI arguments for user-friendliness.
 *   **Functional Change:** The system will provide improved debuggability through granular logs, clearer program status, more robust error handling, and a more intuitive and efficient command-line interface.
 
-This comprehensive set of improvements aims to transform `MyChatDev` into a more powerful, reliable, and autonomous cooperative LLM system.
+This comprehensive set of improvements aims to transform `MyChatDev` into a more powerful, reliable, autonomous, and **user-friendly** cooperative LLM system.
+
+### 13. Introduction of Web User Interface (UI)
+*   **Improvement:** Implement a modern, interactive Web UI using Flutter (frontend) and FastAPI (backend API) to provide a graphical interface for configuring, running, and monitoring workflows.
+*   **Functional Change:** This dramatically improves user-friendliness for non-technical users, offering intuitive controls for all CLI parameters, real-time feedback, and visual representation of the development process. It abstracts away command-line complexities, making the system more accessible and usable.
